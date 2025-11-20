@@ -45,6 +45,28 @@ This project uses environment variables to configure external services. You can 
 |----------|-------------|---------|
 | `NEXT_PUBLIC_AGENT_HOST` | The WebSocket server hostname for the agent. | `agent.thrivelogic.ai` |
 
+## 🔗 Usage & Workflow
+
+### 📱 QR Code Format
+
+The application relies on an `activity` query parameter to link the user to a specific session context. The QR code generated for the user should direct them to:
+
+```
+https://<YOUR_DOMAIN>/?activity=<UNIQUE_ACTIVITY_ID>
+```
+
+- **activity**: (Required) The unique ID representing the specific on-demand task or session.
+
+### 💻 Desktop / Manual Usage
+
+To test or use the application from a desktop browser:
+
+1.  Navigate to the deployment URL (e.g., `http://localhost:3000`).
+2.  **Crucial:** Manually append the `activity` parameter to the URL.
+    - Example: `http://localhost:3000/?activity=demo-123`
+3.  Fill in the **Welcome Form** (Name & Email).
+4.  Upon submission, the chat interface will load and establish a WebSocket connection associated with that Activity ID.
+
 ## 📂 Project Structure
 
 ```bash

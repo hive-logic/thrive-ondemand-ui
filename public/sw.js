@@ -1,7 +1,6 @@
 self.addEventListener("push", function (event) {
   console.log("[Service Worker] Push Received.");
   let data = {};
-
   if (event.data) {
     try {
       console.log("[Service Worker] Event data:", event.data);

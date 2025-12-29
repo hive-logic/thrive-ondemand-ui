@@ -63,11 +63,16 @@ export default function PushNotificationManager() {
     }
   }
 
-  async function sendTestNotification() {
+  async function sendTestNotification(delay: number = 0) {
     if (!subscription) return;
 
     try {
-      setMessage('Sending test notification...');
+      if (delay > 0) {
+        setMessage(`Sending notification in ${delay/1000} seconds... You can close the tab now to test background delivery.`);
+      } else {
+        setMessage('Sending test notification...');
+      }
+
       const response = await fetch('/api/web-push/send', {
         method: 'POST',
         headers: {
@@ -77,13 +82,16 @@ export default function PushNotificationManager() {
           subscription,
           payload: {
             title: 'Test Notification',
-            body: `Hello! This is a test sent at ${new Date().toLocaleTimeString()}`,
+            body: delay > 0 
+              ? `This notification arrived after ${delay/1000} seconds!` 
+              : `Hello! This is a test sent at ${new Date().toLocaleTimeString()}`,
           },
+          delay,
         }),
       });
 
       if (response.ok) {
-        setMessage('Notification sent! Check your device.');
+        if (delay === 0) setMessage('Notification sent! Check your device.');
       } else {
         setMessage('Failed to send notification.');
       }
@@ -124,12 +132,20 @@ export default function PushNotificationManager() {
         )}
 
         {subscription && (
-          <button
-            onClick={sendTestNotification}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
-          >
-            Send Test Notification
-          </button>
+          <>
+            <button
+              onClick={() => sendTestNotification(0)}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+            >
+              Send Test Notification (Now)
+            </button>
+            <button
+              onClick={() => sendTestNotification(5000)}
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+            >
+              Send in 5 Seconds (Close Tab to Test)
+            </button>
+          </>
         )}
       </div>
 

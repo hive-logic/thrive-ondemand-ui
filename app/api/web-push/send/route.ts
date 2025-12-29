@@ -10,10 +10,14 @@ webPush.setVapidDetails(
 
 export async function POST(request: Request) {
   try {
-    const { subscription, payload } = await request.json();
+    const { subscription, payload, delay } = await request.json();
 
     if (!subscription) {
       return NextResponse.json({ error: 'No subscription provided' }, { status: 400 });
+    }
+
+    if (delay) {
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
 
     const notificationPayload = JSON.stringify({

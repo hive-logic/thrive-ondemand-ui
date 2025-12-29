@@ -64,7 +64,16 @@ export default function PushNotificationManager() {
   }
 
   async function sendTestNotification(delay: number = 0) {
-    if (!subscription) return;
+    if (!subscription) {
+      setMessage('No subscription found.');
+      return;
+    }
+
+    // İzin kontrolü
+    if (Notification.permission !== 'granted') {
+      setMessage(`Permission issue: ${Notification.permission}. Please reset permissions.`);
+      return;
+    }
 
     try {
       if (delay > 0) {
@@ -91,9 +100,9 @@ export default function PushNotificationManager() {
       });
 
       if (response.ok) {
-        if (delay === 0) setMessage('Notification sent! Check your device.');
+        if (delay === 0) setMessage('Notification sent from server! Check your OS notification center.');
       } else {
-        setMessage('Failed to send notification.');
+        setMessage('Failed to send notification (Server error).');
       }
     } catch (error) {
       console.error('Error sending notification:', error);

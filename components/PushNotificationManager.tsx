@@ -24,9 +24,17 @@ export default function PushNotificationManager() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
+    // Tarayıcı desteğini kontrol et
+    const isServiceWorkerSupported = 'serviceWorker' in navigator;
+    const isPushManagerSupported = 'PushManager' in window;
+
+    if (isServiceWorkerSupported && isPushManagerSupported) {
       setIsSupported(true);
       registerServiceWorker();
+    } else {
+      console.log('Push Notifications not supported.');
+      console.log('ServiceWorker:', isServiceWorkerSupported);
+      console.log('PushManager:', isPushManagerSupported);
     }
   }, []);
 
@@ -111,7 +119,21 @@ export default function PushNotificationManager() {
   }
 
   if (!isSupported) {
-    return <div>Push notifications are not supported in this browser.</div>;
+    return (
+      <div className="p-4 border rounded shadow-sm bg-white text-black max-w-md mx-auto mt-4">
+        <h3 className="text-lg font-bold mb-2">Push Notifications</h3>
+        <div className="text-red-600 mb-2">
+          Push notifications are not supported in this browser.
+        </div>
+        <div className="text-xs text-gray-500">
+          <p>Notes:</p>
+          <ul className="list-disc pl-4 mt-1">
+            <li>iOS (iPhone/iPad): You must add this app to your Home Screen first (Share {'>'} Add to Home Screen). Requires iOS 16.4+.</li>
+            <li>Make sure you are not in Incognito/Private mode.</li>
+          </ul>
+        </div>
+      </div>
+    );
   }
 
   return (

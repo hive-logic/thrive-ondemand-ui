@@ -1,4 +1,5 @@
 import WelcomeForm from '@/components/WelcomeForm';
+import PushNotificationManager from '@/components/PushNotificationManager';
 
 export default function Page() {
   return (
@@ -14,11 +15,13 @@ export default function Page() {
       <div className="flex-1">
         <div className="max-w-5xl mx-auto px-4 py-10 md:py-16">
           <WelcomeForm />
+          
+          <div className="mt-8 border-t border-white/10 pt-8">
+            <h2 className="text-xl font-bold mb-4 text-white">Debug Tools</h2>
+            <PushNotificationManager />
+          </div>
         </div>
       </div>
     </main>
   );
 }
-
-
-

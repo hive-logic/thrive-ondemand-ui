@@ -63,11 +63,30 @@ export default function PushNotificationManager() {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
       setSubscription(sub);
+      
+      // Backend'e kaydet (DB için)
+      await saveSubscription(sub);
+
       setMessage('Subscribed successfully!');
       console.log('Subscription object:', JSON.stringify(sub));
     } catch (error) {
       console.error('Failed to subscribe:', error);
       setMessage('Failed to subscribe. See console for details.');
+    }
+  }
+
+  async function saveSubscription(sub: PushSubscription) {
+    try {
+      await fetch('/api/web-push/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ subscription: sub }),
+      });
+      console.log('Subscription saved to DB.');
+    } catch (err) {
+      console.error('Failed to save subscription:', err);
     }
   }
 

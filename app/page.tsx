@@ -1,11 +1,15 @@
 import WelcomeForm from '@/components/WelcomeForm';
 import PushNotificationManager from '@/components/PushNotificationManager';
-import IOSInstallPrompt from '@/components/IOSInstallPrompt';
+import NotificationPopup from '@/components/NotificationPopup';
+import { Suspense } from 'react';
 
 export default function Page() {
   return (
     <main className="min-h-screen flex flex-col">
-      <IOSInstallPrompt />
+      {/* useSearchParams kullandığı için Suspense içine almalıyız */}
+      <Suspense fallback={null}>
+        <NotificationPopup />
+      </Suspense>
       <header className="sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-black/20 border-b border-white/10">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">

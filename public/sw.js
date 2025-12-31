@@ -27,6 +27,7 @@ self.addEventListener("push", function (event) {
       dateOfArrival: Date.now(),
       primaryKey: "2",
       url: data.url || "https://thrive-ondemand-ui.vercel.app",
+      msgBody: data.body, // Mesajı popup'ta göstermek için sakla
     },
   };
 
@@ -40,17 +41,36 @@ self.addEventListener("notificationclick", function (event) {
 
   event.notification.close();
 
+  // Bildirimdeki mesajı al
+  const msgBody =
+    event.notification.data && event.notification.data.msgBody
+      ? event.notification.data.msgBody
+      : "New Notification";
+
+  // URL'e parametre olarak ekle (Encode ederek)
+  const targetUrl =
+    new URL("/", self.location.origin).href +
+    "?notification_msg=" +
+    encodeURIComponent(msgBody);
+
   event.waitUntil(
     clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then(function (clientList) {
-        // Eğer açık bir tab varsa ona odaklan
+        // Eğer açık bir tab varsa ona odaklan ve URL'i güncelle (Popup açılsın)
         for (var i = 0; i < clientList.length; i++) {
           var client = clientList[i];
-          if (client.url === "/" && "focus" in client) return client.focus();
+          // Sadece origin eşleşiyorsa
+          if (
+            client.url.startsWith(self.location.origin) &&
+            "focus" in client
+          ) {
+            client.navigate(targetUrl); // Varolan tabı yönlendir
+            return client.focus();
+          }
         }
         // Yoksa yeni aç
-        if (clients.openWindow) return clients.openWindow("/");
+        if (clients.openWindow) return clients.openWindow(targetUrl);
       })
   );
 });

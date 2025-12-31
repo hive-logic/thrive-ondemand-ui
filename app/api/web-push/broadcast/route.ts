@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import webPush from 'web-push';
-import { kv } from '@vercel/kv';
+import redis from '@/lib/redis';
 import { VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_SUBJECT } from '@/lib/push-config';
 
 // VAPID ayarlarını yap
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const { message, title, url } = await request.json();
 
     // 1. Tüm kayıtlı abonelerin Key'lerini çek
-    const keys = await kv.smembers('all_subs');
+    const keys = await redis.smembers('all_subs');
 
     if (!keys || keys.length === 0) {
       return NextResponse.json({ message: 'No subscribers found' });
@@ -33,9 +33,11 @@ export async function POST(request: Request) {
     // 2. Herkes için gönderim yap (Parallel)
     const results = await Promise.allSettled(keys.map(async (key) => {
       // Key'e karşılık gelen detaylı subscription objesini çek
-      const sub = await kv.get<webPush.PushSubscription>(key);
+      const subString = await redis.get(key);
       
-      if (!sub) return { status: 'skipped', key };
+      if (!subString) return { status: 'skipped', key };
+
+      const sub = JSON.parse(subString);
 
       try {
         await webPush.sendNotification(sub, notificationPayload);
@@ -44,8 +46,8 @@ export async function POST(request: Request) {
         // Eğer kullanıcı aboneliği iptal ettiyse (410 Gone), listemizden temizleyelim
         if (err.statusCode === 410 || err.statusCode === 404) {
           console.log(`Subscription gone, removing: ${key}`);
-          await kv.del(key);
-          await kv.srem('all_subs', key);
+          await redis.del(key);
+          await redis.srem('all_subs', key);
         }
         throw err;
       }

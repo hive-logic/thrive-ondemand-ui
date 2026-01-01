@@ -1,12 +1,10 @@
 import WelcomeForm from "@/components/WelcomeForm";
-import PushNotificationManager from "@/components/PushNotificationManager";
 import NotificationPopup from "@/components/NotificationPopup";
 import { Suspense } from "react";
 
 export default function Page() {
   return (
     <main className="h-[100dvh] flex flex-col bg-black text-white overflow-y-auto overscroll-none pt-safe">
-      <PushNotificationManager />
       {/* useSearchParams kullandığı için Suspense içine almalıyız */}
       <Suspense fallback={null}>
         <NotificationPopup />

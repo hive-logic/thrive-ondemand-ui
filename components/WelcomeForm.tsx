@@ -61,13 +61,28 @@ export default function WelcomeForm() {
     async function run() {
       try {
         const params = new URLSearchParams(window.location.search);
-        const act = (params.get("activity") || "").trim();
+        let act = (params.get("activity") || "").trim();
+
+        // URL'de yoksa LocalStorage'dan kurtarmayı dene (PWA için kritik)
+        if (!act) {
+          try {
+            const storedAct = window.localStorage.getItem("activity_id");
+            if (storedAct) act = storedAct;
+          } catch {}
+        }
+
         if (!act) {
           if (!cancelled) {
             setActivityStatus("invalid");
           }
           return;
         }
+
+        // Bulunan ID'yi sakla (Gelecek sefer için)
+        try {
+          window.localStorage.setItem("activity_id", act);
+        } catch {}
+
         if (!cancelled) {
           setActivityId(act);
         }

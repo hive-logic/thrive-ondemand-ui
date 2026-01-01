@@ -34,10 +34,13 @@ export default function NotificationPopup() {
     setMessage(null);
     processedRef.current = null;
     
-    // URL'den parametreyi temizlemek için (temiz bir URL için)
+    // URL'den parametreyi temizle VE sayfayı yenile/tetikle
+    // Bu sayede WelcomeForm'daki "hasNotification" engeli kalkacak ve yönlendirme çalışacak.
     const url = new URL(window.location.href);
     url.searchParams.delete('notification_msg');
-    window.history.replaceState({}, '', url.toString());
+    
+    // window.location.href ile tam bir yönlendirme yapıyoruz ki WelcomeForm baştan çalışsın
+    window.location.href = url.toString();
   };
 
   if (!message) return null;

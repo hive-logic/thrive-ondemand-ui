@@ -89,7 +89,12 @@ export default function WelcomeForm() {
         const status = await checkActivityValidity(act);
         if (cancelled) return;
         setActivityStatus(status);
-        if (status === "active" && existing) {
+
+        // KONTROL: Eğer URL'de bildirim mesajı varsa yönlendirme YAPMA.
+        // Kullanıcı modalı kapatana kadar bekle.
+        const hasNotification = params.has("notification_msg");
+
+        if (status === "active" && existing && !hasNotification) {
           router.replace(`/chat?activity=${encodeURIComponent(act)}`);
         }
       } catch {

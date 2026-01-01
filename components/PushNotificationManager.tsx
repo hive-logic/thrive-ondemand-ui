@@ -19,39 +19,36 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 export default function PushNotificationManager() {
-  const [isSupported, setIsSupported] = useState(false);
+  const [showBanner, setShowBanner] = useState(false);
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
-    // Tarayıcı desteğini kontrol et
-    const isServiceWorkerSupported = 'serviceWorker' in navigator;
-    const isPushManagerSupported = 'PushManager' in window;
+    // Sadece tarayıcı ve service worker destekliyorsa çalış
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-    if (isServiceWorkerSupported && isPushManagerSupported) {
-      setIsSupported(true);
-      registerServiceWorker();
-    } else {
-      console.log('Push Notifications not supported.');
-      console.log('ServiceWorker:', isServiceWorkerSupported);
-      console.log('PushManager:', isPushManagerSupported);
-    }
+    // Mevcut durumu kontrol et
+    checkSubscriptionStatus();
   }, []);
 
-  async function registerServiceWorker() {
+  async function checkSubscriptionStatus() {
     try {
       const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/',
         updateViaCache: 'none',
       });
-      console.log('Service Worker registered with scope:', registration.scope);
-      
+
       const existingSubscription = await registration.pushManager.getSubscription();
-      if (existingSubscription) {
+      
+      // Eğer abone değilse ve izin durumu 'default' ise (henüz sorulmamışsa) banner göster
+      if (!existingSubscription && Notification.permission === 'default') {
+        setShowBanner(true);
+      } else if (existingSubscription) {
         setSubscription(existingSubscription);
+        // Abone ise LocalStorage'ı güncelle (garanti olsun)
+        localStorage.setItem('push_subscription', JSON.stringify(existingSubscription));
       }
     } catch (error) {
-      console.error('Service Worker registration failed:', error);
+      console.error('SW registration failed:', error);
     }
   }
 
@@ -62,157 +59,61 @@ export default function PushNotificationManager() {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
-      setSubscription(sub);
       
-      // 1. LocalStorage'a kaydet (Form doldurulunca kullanılacak)
+      setSubscription(sub);
+      setShowBanner(false); // Banner'ı kapat
+      
+      // 1. LocalStorage'a kaydet
       localStorage.setItem('push_subscription', JSON.stringify(sub));
 
-      // 2. Eğer kullanıcı zaten giriş yapmışsa hemen kaydet
+      // 2. Kullanıcı giriş yapmışsa backend'e gönder
       const storedUser = localStorage.getItem('thrive_user');
       if (storedUser) {
-        await saveSubscription(sub, JSON.parse(storedUser));
+        await fetch('/api/web-push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            subscription: sub,
+            user: JSON.parse(storedUser) 
+          }),
+        });
       }
-
-      setMessage('Subscribed successfully!');
-      console.log('Subscription stored locally:', JSON.stringify(sub));
     } catch (error) {
       console.error('Failed to subscribe:', error);
-      setMessage('Failed to subscribe. See console for details.');
     }
   }
 
-  async function saveSubscription(sub: PushSubscription, userData?: any) {
-    try {
-      await fetch('/api/web-push/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          subscription: sub,
-          user: userData // Kullanıcı bilgisini de gönderelim (opsiyonel)
-        }),
-      });
-      console.log('Subscription saved to DB.');
-    } catch (err) {
-      console.error('Failed to save subscription:', err);
-    }
-  }
-
-  async function sendTestNotification(delay: number = 0) {
-    if (!subscription) {
-      setMessage('No subscription found.');
-      return;
-    }
-
-    // İzin kontrolü
-    if (Notification.permission !== 'granted') {
-      setMessage(`Permission issue: ${Notification.permission}. Please reset permissions.`);
-      return;
-    }
-
-    try {
-      if (delay > 0) {
-        setMessage(`Sending notification in ${delay/1000} seconds... You can close the tab now to test background delivery.`);
-      } else {
-        setMessage('Sending test notification...');
-      }
-
-      const response = await fetch('/api/web-push/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subscription,
-          payload: {
-            title: 'Test Notification',
-            body: delay > 0 
-              ? `This notification arrived after ${delay/1000} seconds!` 
-              : `Hello! This is a test sent at ${new Date().toLocaleTimeString()}`,
-          },
-          delay,
-        }),
-      });
-
-      if (response.ok) {
-        if (delay === 0) setMessage('Notification sent from server! Check your OS notification center.');
-      } else {
-        setMessage('Failed to send notification (Server error).');
-      }
-    } catch (error) {
-      console.error('Error sending notification:', error);
-      setMessage('Error sending notification.');
-    }
-  }
-
-  if (!isSupported) {
-    return (
-      <div className="p-4 border rounded shadow-sm bg-white text-black max-w-md mx-auto mt-4">
-        <h3 className="text-lg font-bold mb-2">Push Notifications</h3>
-        <div className="text-red-600 mb-2">
-          Push notifications are not supported in this browser.
-        </div>
-        <div className="text-xs text-gray-500">
-          <p>Notes:</p>
-          <ul className="list-disc pl-4 mt-1">
-            <li>iOS (iPhone/iPad): You must add this app to your Home Screen first (Share {'>'} Add to Home Screen). Requires iOS 16.4+.</li>
-            <li>Make sure you are not in Incognito/Private mode.</li>
-          </ul>
-        </div>
-      </div>
-    );
-  }
+  if (!showBanner) return null;
 
   return (
-    <div className="p-4 border rounded shadow-sm bg-white text-black max-w-md mx-auto mt-4">
-      <h3 className="text-lg font-bold mb-2">Push Notifications</h3>
-      
-      <div className="mb-4">
-        {subscription ? (
-          <div className="text-green-600 font-medium mb-2">
-            ✓ Subscribed to notifications
+    <div className="fixed top-0 left-0 right-0 z-50 animate-in fade-in slide-in-from-top-2 duration-500">
+      <div className="mx-4 mt-2 pt-safe">
+        <div className="bg-[#1b1b1c]/90 backdrop-blur-md border border-white/10 text-white p-3 rounded-xl shadow-2xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 text-lg">
+              🔔
+            </span>
+            <div className="text-sm font-medium">
+              Enable notifications
+              <span className="block text-xs text-white/50 font-normal">Stay updated with event news</span>
+            </div>
           </div>
-        ) : (
-          <div className="text-gray-600 mb-2">
-            Not subscribed yet.
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        {!subscription && (
-          <button
-            onClick={subscribeToPush}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-          >
-            Allow Notifications
-          </button>
-        )}
-
-        {subscription && (
-          <>
-            <button
-              onClick={() => sendTestNotification(0)}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowBanner(false)}
+              className="px-3 py-1.5 text-xs text-white/60 hover:text-white transition-colors"
             >
-              Send Test Notification (Now)
+              Later
             </button>
             <button
-              onClick={() => sendTestNotification(5000)}
-              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+              onClick={subscribeToPush}
+              className="px-3 py-1.5 bg-white text-black text-xs font-semibold rounded-lg hover:bg-white/90 transition-colors"
             >
-              Send in 5 Seconds (Close Tab to Test)
+              Enable
             </button>
-          </>
-        )}
-      </div>
-
-      {message && (
-        <div className="mt-4 text-sm text-gray-700 bg-gray-100 p-2 rounded">
-          {message}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

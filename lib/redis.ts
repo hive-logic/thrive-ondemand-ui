@@ -7,7 +7,9 @@ if (!redisUrl) {
   throw new Error('Redis connection string (REDIS_URL) is missing!');
 }
 
-const redis = new Redis(redisUrl);
+const redis = new Redis(redisUrl, {
+  tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+});
 
 export default redis;
 

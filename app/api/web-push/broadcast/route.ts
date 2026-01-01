@@ -16,9 +16,10 @@ export async function POST(request: Request) {
 
     // 1. Tüm kayıtlı abonelerin Key'lerini çek
     const keys = await redis.smembers('all_subs');
+    console.log('All keys in DB:', keys); // LOG EKLE
 
     if (!keys || keys.length === 0) {
-      return NextResponse.json({ message: 'No subscribers found' });
+      return NextResponse.json({ message: 'No subscribers found', keys });
     }
 
     console.log(`Found ${keys.length} subscribers. Sending notifications...`);

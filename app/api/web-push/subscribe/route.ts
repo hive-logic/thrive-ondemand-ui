@@ -13,11 +13,14 @@ export async function POST(request: Request) {
     const subId = subscription.endpoint.split('/').pop();
     const key = `sub:${subId}`;
 
-    // 1. Aboneliği sakla (ioredis ile stringify yapmamız gerekebilir, ama ioredis objeyi desteklemez, string yapalım)
+    console.log('Saving subscription:', key); // LOG EKLE
+
+    // 1. Aboneliği sakla
     await redis.set(key, JSON.stringify(subscription));
 
     // 2. ID'yi ana listeye (Set) ekle
-    await redis.sadd('all_subs', key);
+    const added = await redis.sadd('all_subs', key);
+    console.log('Added to set:', added); // LOG EKLE
 
     return NextResponse.json({ success: true });
   } catch (error) {

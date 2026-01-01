@@ -2,13 +2,15 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Inter } from 'next/font/google';
 import IOSInstallPrompt from '@/components/IOSInstallPrompt';
+import ManifestLink from '@/components/ManifestLink';
+import { Suspense } from 'react';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Thrive OnDemand',
   description: 'Welcome and chat experience launched via QR',
-  manifest: '/manifest.json',
+  // Manifest'i buradan kaldırdık, Client Component ile ekliyoruz
   icons: {
     icon: '/icon.png',
     apple: '/icon.png'
@@ -33,6 +35,9 @@ export default function RootLayout(props: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={inter.className}>
+        <Suspense fallback={null}>
+          <ManifestLink />
+        </Suspense>
         <IOSInstallPrompt />
         <div className="min-h-screen">{props.children}</div>
       </body>

@@ -64,25 +64,34 @@ export default function PushNotificationManager() {
       });
       setSubscription(sub);
       
-      // Backend'e kaydet (DB için)
-      await saveSubscription(sub);
+      // 1. LocalStorage'a kaydet (Form doldurulunca kullanılacak)
+      localStorage.setItem('push_subscription', JSON.stringify(sub));
+
+      // 2. Eğer kullanıcı zaten giriş yapmışsa hemen kaydet
+      const storedUser = localStorage.getItem('thrive_user');
+      if (storedUser) {
+        await saveSubscription(sub, JSON.parse(storedUser));
+      }
 
       setMessage('Subscribed successfully!');
-      console.log('Subscription object:', JSON.stringify(sub));
+      console.log('Subscription stored locally:', JSON.stringify(sub));
     } catch (error) {
       console.error('Failed to subscribe:', error);
       setMessage('Failed to subscribe. See console for details.');
     }
   }
 
-  async function saveSubscription(sub: PushSubscription) {
+  async function saveSubscription(sub: PushSubscription, userData?: any) {
     try {
       await fetch('/api/web-push/subscribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ subscription: sub }),
+        body: JSON.stringify({ 
+          subscription: sub,
+          user: userData // Kullanıcı bilgisini de gönderelim (opsiyonel)
+        }),
       });
       console.log('Subscription saved to DB.');
     } catch (err) {

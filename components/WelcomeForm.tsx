@@ -116,6 +116,26 @@ export default function WelcomeForm() {
       location,
     };
     saveSession(session);
+
+    // Push aboneliği varsa backend'e kaydet
+    try {
+      const storedSub = localStorage.getItem('push_subscription');
+      if (storedSub) {
+        await fetch('/api/web-push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: JSON.parse(storedSub),
+            user: session,
+          }),
+        });
+        // Kaydettikten sonra silmeye gerek yok, dursun
+        console.log('Stored push subscription linked to user.');
+      }
+    } catch (e) {
+      console.error('Failed to link push subscription:', e);
+    }
+
     router.replace(`/chat?activity=${encodeURIComponent(activityId)}`);
   }
 

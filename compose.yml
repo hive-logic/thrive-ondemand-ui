@@ -1,0 +1,30 @@
+services:
+
+  thrive_ondemand_ui:
+    hostname: thrive_ondemand_ui
+    container_name: thrive_ondemand_ui
+    image: localhost/thrive_ondemand_ui:latest
+    build:
+      context: ./
+      network: host
+      dockerfile: Dockerfile
+      shm_size: "6gb"
+    restart: always
+    environment:
+      VIRTUAL_HOST: ondemand.thrivelogic.ai
+      VIRTUAL_PORT: 3000
+      LETSENCRYPT_HOST: ondemand.thrivelogic.ai
+      LETSENCRYPT_EMAIL: ugur@thrivelogic.ai
+    expose:
+      - 3000
+    env_file:
+      - .env
+    networks:
+      - thrive_ondemand_ui
+      - proxy
+
+networks:
+  thrive_ondemand_ui:
+  proxy:
+    name: proxy
+    external: true

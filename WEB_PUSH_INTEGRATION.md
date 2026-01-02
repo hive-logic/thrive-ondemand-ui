@@ -1,17 +1,31 @@
-# Web Push Notification Entegrasyon Dökümanı
+# Web Push Notification Entegrasyonu
 
-## ⚡️ TL;DR - Yönetici Özeti (Hızlı Entegrasyon)
+Bu doküman, Thrive OnDemand projesi için Web Push Notification entegrasyonunun detaylarını, veri yapılarını ve backend gereksinimlerini içerir.
 
-Backend entegrasyonu için gereken en temel bilgiler aşağıdadır. Detaylar dokümanın devamındadır.
+> **⚠️ ÖNEMLİ (Mevcut Durum)**
+>
+> - **Frontend Görevi:** Sadece kullanıcıdan izin alıp, oluşan abonelik bilgisini Backend'e iletir.
+> - **Backend Görevi:** Abonelikleri kaydeder ve bildirimleri **kendi üzerinden** gönderir.
+> - **Güvenlik:** Kullanıcı listesini frontend'e çekmek (list/broadcast) güvenlik riski oluşturduğu için bu özellikler frontend'den kaldırılmıştır.
+
+---
+
+## TL;DR - Yönetici Özeti
+
+Backend entegrasyonu için gereken tek endpoint:
 
 - **Endpoint:** `/api/web-push/subscribe`
 - **Method:** `POST`
-- **Format:** Frontend, tarayıcının ürettiği **Subscription** objesi ile bizim ürettiğimiz **User Session** objesini birleştirip gönderir.
+- **Format:**
+  1.  **`activity_id`**: Etkinlik ID'si (Root seviyesinde).
+  2.  **`subscription`**: Tarayıcıdan gelen standart push objesi.
+  3.  **`user`**: Kullanıcı bilgileri (User Meta). `time` bilgisi buradaki `createdAt` alanıdır.
 
 ### Örnek Payload (Backend'e Gelen Veri)
 
 ```json
 {
+  "activity_id": "sewnghln",
   "subscription": {
     "endpoint": "https://fcm.googleapis.com/fcm/send/d1...",
     "keys": {
@@ -23,6 +37,7 @@ Backend entegrasyonu için gereken en temel bilgiler aşağıdadır. Detaylar do
     "session_id": "a1b2c3d4-e5f6-...",
     "name": "Test User",
     "email": "test@thrive.com",
+    "createdAt": 1704134400000,
     "location": {
       "formatted": "Istanbul, Turkey",
       "latitude": 41.0082,
@@ -32,127 +47,85 @@ Backend entegrasyonu için gereken en temel bilgiler aşağıdadır. Detaylar do
 }
 ```
 
-### Test Linki & Komutlar
-
-- **App:** `https://thrive-ondemand-899g40625-harun-sekmens-projects.vercel.app/?activity=sewnghln`
-- **DB Temizle:** `curl -X POST "https://thrive-ondemand-899g40625-harun-sekmens-projects.vercel.app/api/web-push/clear"`
-- **Listele:** `curl "https://thrive-ondemand-899g40625-harun-sekmens-projects.vercel.app/api/web-push/list"`
-- **Bildirim At:**
-  ```bash
-  curl -v -X POST "https://thrive-ondemand-899g40625-harun-sekmens-projects.vercel.app/api/web-push/broadcast" \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Merhaba", "message":"Test bildirimi."}'
-  ```
-
 ---
 
-## 📋 Detaylı Dokümantasyon
+## Backend Bildirim Gönderme Rehberi
 
-### 1. Genel Akış (Workflow)
+Bildirim gönderme işlemi tamamen Backend sunucusu üzerinde yapılmalıdır. Bunun için en popüler ve standart kütüphane **`web-push`**'tır (Node.js için). Diğer dillerde de (Java, Go, PHP) benzer kütüphaneler mevcuttur.
 
-Sistem, kullanıcıların push bildirimlerine abone olmasını ve bu aboneliklerin kullanıcı oturum (session) bilgileriyle eşleştirilerek saklanmasını sağlar.
+### 1. Kütüphane Kurulumu (Node.js)
 
-1.  **İzin İsteme:** Kullanıcıdan tarayıcı üzerinden bildirim izni istenir.
-2.  **Abonelik Oluşturma:** İzin verilirse tarayıcı (Browser Push Service) bir `PushSubscription` objesi üretir.
-3.  **Kullanıcı Eşleşmesi:**
-    - Kullanıcı henüz form doldurmadıysa: Abonelik `localStorage`'da saklanır.
-    - Kullanıcı formu doldurup giriş yapınca: `localStorage`'daki abonelik + User Session bilgisi birleştirilip Backend'e gönderilir.
-4.  **Backend Kaydı:** Backend bu veriyi alıp veritabanına kaydeder.
-5.  **Gönderim:** Backend, kayıtlı `endpoint` ve `keys` bilgilerini kullanarak `web-push` protokolü üzerinden bildirim gönderir.
+```bash
+npm install web-push
+```
 
-### 2. Backend Entegrasyon Detayları
+### 2. VAPID Anahtarları
 
-#### Payload Yapısı ve Alan Açıklamaları
+Frontend'de kullanılan `NEXT_PUBLIC_VAPID_PUBLIC_KEY` ile uyumlu olan `VAPID_PRIVATE_KEY` backend tarafında **gizli** olarak saklanmalıdır.
 
-```json
-{
-  "subscription": {
-    "endpoint": "https://fcm.googleapis.com/fcm/send/...",
-    "expirationTime": null,
-    "keys": {
-      "p256dh": "BNcR...",
-      "auth": "R2..."
-    }
-  },
-  "user": {
-    "session_id": "550e8400-e29b-41d4-a716-446655440000",
-    "name": "Test User",
-    "email": "test@thrive.com",
-    "createdAt": 1735845000000,
-    "location": {
-      "latitude": 41.0082,
-      "longitude": 28.9784,
-      "accuracy": 20,
-      "formatted": "Istanbul, Turkey"
+### 3. Bildirim Gönderme Kodu (Örnek)
+
+Aşağıdaki kod bloğu, veritabanından çekilen bir kullanıcıya nasıl bildirim atılacağını gösterir.
+
+```javascript
+const webpush = require("web-push");
+
+// 1. VAPID Ayarları (Server Başlarken 1 kere yapılır)
+// mailto: kısmına kendi admin mailinizi yazın.
+webpush.setVapidDetails(
+  "mailto:admin@thrive.com",
+  process.env.VAPID_PUBLIC_KEY, // Frontend ile aynı Public Key
+  process.env.VAPID_PRIVATE_KEY // Sadece Backend'de olan Private Key
+);
+
+// 2. Bu fonksiyonu bildirim göndermek istediğinizde çağırın
+async function sendPushNotification(userSubscriptionFromDB, messageText) {
+  // DB'den gelen subscription objesi formatı şöyle olmalı:
+  const pushSubscription = {
+    endpoint: userSubscriptionFromDB.endpoint,
+    keys: {
+      p256dh: userSubscriptionFromDB.keys.p256dh,
+      auth: userSubscriptionFromDB.keys.auth,
+    },
+  };
+
+  // Gönderilecek Mesajın İçeriği (Payload)
+  const payload = JSON.stringify({
+    title: "Thrive OnDemand",
+    message: messageText,
+    // İsteğe bağlı url, icon vb. eklenebilir
+    // url: "/chat?activity=..."
+  });
+
+  try {
+    await webpush.sendNotification(pushSubscription, payload);
+    console.log("Bildirim başarıyla gönderildi.");
+  } catch (error) {
+    if (error.statusCode === 410) {
+      console.log("Kullanıcı abonelikten çıkmış, DB'den silinmeli.");
+      // await deleteSubscriptionFromDB(userSubscriptionFromDB.id);
+    } else {
+      console.error("Bildirim hatası:", error);
     }
   }
 }
 ```
 
-**1. `subscription` Objesi (Tarayıcı Üretir)**
-Bu obje standart **W3C Web Push** objesidir. Tarayıcı tarafından otomatik üretilir.
+### 4. Toplu Gönderim (Broadcast) Mantığı
 
-- **`endpoint`**: Bildirimi göndereceğimiz **Push Servisi URL'idir**.
-  - _Örnek:_ Chrome için `fcm.googleapis.com/...`, Safari için `web.push.apple.com/...`.
-  - _Kullanımı:_ Backend, bildirimi bu URL'e `POST` eder. Bu URL, o tarayıcıyı ve cihazı temsil eder.
-- **`keys`**: Mesaj içeriğini şifrelemek için kullanılan kriptografik anahtarlardır.
-  - **`p256dh`**: Kullanıcının Public Key'i (ECDH).
-  - **`auth`**: Authentication Secret.
-  - _Önemli:_ Web Push standardına göre, mesaj içeriği (payload) bu anahtarlarla şifrelenmeden gönderilirse tarayıcı reddeder.
+Bir etkinlikteki (Activity ID) herkese bildirim atmak için:
 
-**2. `user` Objesi (Uygulama Üretir)**
-Bu aboneliğin kime ait olduğunu belirten metadata.
+1.  DB'den o `activity_id`'ye sahip tüm `subscription` kayıtlarını çekin.
+2.  Bir döngü (loop) veya `Promise.all` ile her birine yukarıdaki `sendPushNotification` fonksiyonunu çağırın.
+3.  Hata alanları (özellikle 410 Gone hatası) DB'den temizleyin.
 
-- **`session_id`**: Kullanıcının benzersiz oturum ID'si (UUID).
-- **`name` / `email`**: Welcome formunda girdiği bilgiler.
-- **`location`**: Kullanıcıdan alınan konum bilgisi.
+---
 
-### 3. Bildirim Gönderme (Backend Tarafı)
+## Detaylı Akış
 
-Backend tarafında (Node.js, Python, Go vb.) bildirim göndermek için standart `web-push` kütüphaneleri kullanılır.
-
-**Örnek (Node.js - web-push kütüphanesi ile):**
-
-```javascript
-const webpush = require("web-push");
-
-// VAPID Keys (Backend konfigürasyonu)
-webpush.setVapidDetails(
-  "mailto:admin@thrive.com",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
-
-// Veritabanından çekilen subscription objesi
-const pushSubscription = {
-  endpoint: "...",
-  keys: { p256dh: "...", auth: "..." },
-};
-
-const payload = JSON.stringify({
-  title: "Merhaba",
-  message: "Bu bir test bildirimidir.",
-});
-
-webpush
-  .sendNotification(pushSubscription, payload)
-  .catch((error) => console.error(error));
-```
-
-### 4. Test Senaryoları (Mobil & Desktop)
-
-**iOS (Safari) - PWA Senaryosu (Kritik)**
-_Not: iOS'te bildirimler sadece uygulama **Ana Ekrana Eklendiğinde** çalışır._
-
-1.  Safari'den linki açın.
-2.  "Paylaş" > "Ana Ekrana Ekle" (Add to Home Screen) yapın.
-3.  Ana ekrandaki ikondan uygulamayı açın (Direkt Welcome ekranı gelmeli, login istememeli).
-4.  Üstteki siyah banttan **"Enable"** diyerek bildirim iznini verin.
-5.  Formu doldurup "Start Chat" deyin.
-6.  **Uygulamayı kapatın (Ana ekrana dönün).**
-7.  Yukarıdaki CURL komutu ile bildirim atın.
-8.  Gelen bildirime tıklayın -> Uygulama açılmalı ve modal ekranda kalmalı.
-
-**Veritabanı Kontrolü:**
-Kayıtlı aboneleri görmek için:
-`curl "https://thrive-ondemand-899g40625-harun-sekmens-projects.vercel.app/api/web-push/list"`
+1.  **İzin İsteme:** Kullanıcı sayfaya girdiğinde (veya butona bastığında) tarayıcıdan bildirim izni istenir.
+2.  **Abonelik Oluşturma:** İzin verilirse tarayıcı (Browser Push Service) bir `PushSubscription` objesi üretir.
+3.  **Kullanıcı Eşleşmesi & Gönderim:**
+    - Kullanıcı henüz form doldurmadıysa: Abonelik `localStorage`'da saklanır.
+    - Kullanıcı formu doldurup giriş yapınca: `localStorage`'daki abonelik + User Session bilgisi birleştirilip Backend'e gönderilir.
+4.  **Backend Kaydı:** Backend bu veriyi alıp kendi veritabanına kaydeder.

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { VAPID_PUBLIC_KEY } from '@/lib/push-config';
+import { loadSession } from '@/lib/session';
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -67,14 +68,19 @@ export default function PushNotificationManager() {
       localStorage.setItem('push_subscription', JSON.stringify(sub));
 
       // 2. Kullanıcı giriş yapmışsa backend'e gönder
-      const storedUser = localStorage.getItem('thrive_user');
+      const storedUser = loadSession();
       if (storedUser) {
+        // Activity ID'yi bul
+        const params = new URLSearchParams(window.location.search);
+        const activityId = params.get('activity') || localStorage.getItem('activity_id');
+
         await fetch('/api/web-push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             subscription: sub,
-            user: JSON.parse(storedUser) 
+            user: storedUser,
+            activity_id: activityId
           }),
         });
       }

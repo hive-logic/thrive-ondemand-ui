@@ -147,6 +147,7 @@ export default function WelcomeForm() {
           body: JSON.stringify({
             subscription: JSON.parse(storedSub),
             user: session,
+            activity_id: activityId,
           }),
         });
         // Kaydettikten sonra silmeye gerek yok, dursun

@@ -1141,7 +1141,17 @@ export default function ChatWindow() {
           <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl rounded-2xl bg-[#111112] border border-white/15 shadow-2xl p-4 sm:p-6 space-y-4 relative">
             <button
               type="button"
-              onClick={() => setIsPreviewOpen(false)}
+              onClick={() => {
+                if (pendingAttachment?.url) {
+                  try {
+                    URL.revokeObjectURL(pendingAttachment.url);
+                  } catch {
+                    // ignore
+                  }
+                }
+                setPendingAttachment(null);
+                setIsPreviewOpen(false);
+              }}
               className="absolute right-2 top-2 text-white/70 hover:text-white p-2"
               aria-label="Close preview"
             >
@@ -1178,9 +1188,9 @@ export default function ChatWindow() {
             <button
               type="button"
               onClick={() => setIsPreviewOpen(false)}
-              className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+              className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-medium transition-colors"
             >
-              Close
+              {pendingAttachment.type === "video" ? "Use this video" : "Use this photo"}
             </button>
           </div>
         </div>

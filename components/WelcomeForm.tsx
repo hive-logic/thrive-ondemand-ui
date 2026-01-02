@@ -61,20 +61,40 @@ export default function WelcomeForm() {
     async function run() {
       try {
         const params = new URLSearchParams(window.location.search);
-        const act = (params.get("activity") || "").trim();
+        let act = (params.get("activity") || "").trim();
+
+        // URL'de yoksa LocalStorage'dan kurtarmayı dene (PWA için kritik)
+        if (!act) {
+          try {
+            const storedAct = window.localStorage.getItem("activity_id");
+            if (storedAct) act = storedAct;
+          } catch {}
+        }
+
         if (!act) {
           if (!cancelled) {
             setActivityStatus("invalid");
           }
           return;
         }
+
+        // Bulunan ID'yi sakla (Gelecek sefer için)
+        try {
+          window.localStorage.setItem("activity_id", act);
+        } catch {}
+
         if (!cancelled) {
           setActivityId(act);
         }
         const status = await checkActivityValidity(act);
         if (cancelled) return;
         setActivityStatus(status);
-        if (status === "active" && existing) {
+
+        // KONTROL: Eğer URL'de bildirim mesajı varsa yönlendirme YAPMA.
+        // Kullanıcı modalı kapatana kadar bekle.
+        const hasNotification = params.has("notification_msg");
+
+        if (status === "active" && existing && !hasNotification) {
           router.replace(`/chat?activity=${encodeURIComponent(act)}`);
         }
       } catch {
@@ -116,6 +136,26 @@ export default function WelcomeForm() {
       location,
     };
     saveSession(session);
+
+    // Push aboneliği varsa backend'e kaydet
+    try {
+      const storedSub = localStorage.getItem('push_subscription');
+      if (storedSub) {
+        await fetch('/api/web-push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: JSON.parse(storedSub),
+            user: session,
+          }),
+        });
+        // Kaydettikten sonra silmeye gerek yok, dursun
+        console.log('Stored push subscription linked to user.');
+      }
+    } catch (e) {
+      console.error('Failed to link push subscription:', e);
+    }
+
     router.replace(`/chat?activity=${encodeURIComponent(activityId)}`);
   }
 

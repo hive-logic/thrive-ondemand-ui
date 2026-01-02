@@ -22,6 +22,9 @@ body {
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
 html.keyboard-open .pb-safe {
   padding-bottom: 0 !important;
 }

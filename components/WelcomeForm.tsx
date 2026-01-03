@@ -5,6 +5,7 @@ import { loadSession, saveSession, UserSession } from "@/lib/session";
 import { getLocationWithAddress } from "@/lib/geolocation";
 import { useRouter } from "next/navigation";
 import { checkActivityValidity, ActivityStatus } from "@/lib/activity";
+import { checkUserId, saveSubscription } from "@/lib/backend-api";
 
 function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -52,8 +53,9 @@ export default function WelcomeForm() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [activityStatus, setActivityStatus] =
-    useState<ActivityStatus | "checking">("checking");
+  const [activityStatus, setActivityStatus] = useState<
+    ActivityStatus | "checking"
+  >("checking");
   const [activityId, setActivityId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -110,7 +112,10 @@ export default function WelcomeForm() {
   }, [existing, router]);
 
   const disabled =
-    !name.trim() || name.trim().length < 2 || !validateEmail(email) || submitting;
+    !name.trim() ||
+    name.trim().length < 2 ||
+    !validateEmail(email) ||
+    submitting;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -137,24 +142,23 @@ export default function WelcomeForm() {
     };
     saveSession(session);
 
-    // Push aboneliği varsa backend'e kaydet
+    // 1. Backend'den User ID (UUID) al
     try {
-      const storedSub = localStorage.getItem('push_subscription');
-      if (storedSub) {
-        await fetch('/api/web-push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subscription: JSON.parse(storedSub),
-            user: session,
-            activity_id: activityId,
-          }),
-        });
-        // Kaydettikten sonra silmeye gerek yok, dursun
-        console.log('Stored push subscription linked to user.');
+      const userUuid = await checkUserId(activityId, email.trim());
+      if (userUuid) {
+        localStorage.setItem("user_uuid", userUuid); // UUID'yi sakla
+
+        // 2. Eğer push aboneliği varsa backend'e kaydet (UUID ile)
+        const storedSub = localStorage.getItem("push_subscription");
+        if (storedSub) {
+          const subscription = JSON.parse(storedSub);
+          await saveSubscription(activityId, userUuid, subscription);
+        }
+      } else {
+        console.warn("User ID could not be retrieved from backend.");
       }
     } catch (e) {
-      console.error('Failed to link push subscription:', e);
+      console.error("Failed to sync with backend:", e);
     }
 
     router.replace(`/chat?activity=${encodeURIComponent(activityId)}`);
@@ -206,7 +210,13 @@ export default function WelcomeForm() {
           </label>
           <div className="relative">
             <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/50">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden
+              >
                 <path
                   d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5Z"
                   stroke="currentColor"
@@ -239,7 +249,13 @@ export default function WelcomeForm() {
           </label>
           <div className="relative">
             <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/50">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden
+              >
                 <path
                   d="M3 7.5a2.5 2.5 0 0 1 2.5-2.5h13A2.5 2.5 0 0 1 21 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5v-9Z"
                   stroke="currentColor"
@@ -266,7 +282,9 @@ export default function WelcomeForm() {
             />
           </div>
           {email && !validateEmail(email) && (
-            <p className="text-xs text-red-400">Please enter a valid email address.</p>
+            <p className="text-xs text-red-400">
+              Please enter a valid email address.
+            </p>
           )}
         </div>
 
@@ -275,10 +293,12 @@ export default function WelcomeForm() {
           disabled={disabled}
           className="w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all bg-gradient-to-tr from-primary to-accent hover:brightness-110 shadow-[0_10px_25px_rgba(233,66,108,0.25)]"
         >
-          {submitting ? 'Saving…' : 'Start chat'}
+          {submitting ? "Saving…" : "Start chat"}
         </button>
 
-        <p className="text-xs text-white/60 text-center">We will collect your location.</p>
+        <p className="text-xs text-white/60 text-center">
+          We will collect your location.
+        </p>
         {locationError && (
           <p className="text-xs text-red-400 text-center">{locationError}</p>
         )}
@@ -286,6 +306,3 @@ export default function WelcomeForm() {
     </div>
   );
 }
-
-
-

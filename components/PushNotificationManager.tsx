@@ -1,14 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { VAPID_PUBLIC_KEY } from '@/lib/push-config';
-import { loadSession } from '@/lib/session';
+import { useState, useEffect, useRef } from "react";
+import { VAPID_PUBLIC_KEY } from "@/lib/push-config";
+import { loadSession } from "@/lib/session";
+import { saveSubscription } from "@/lib/backend-api";
 
 function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
-    .replace(/\-/g, '+')
-    .replace(/_/g, '/');
+    .replace(/\-/g, "+")
+    .replace(/_/g, "/");
 
   const rawData = window.atob(base64);
   const outputArray = new Uint8Array(rawData.length);
@@ -21,11 +22,13 @@ function urlBase64ToUint8Array(base64String: string) {
 
 export default function PushNotificationManager() {
   const [showBanner, setShowBanner] = useState(false);
-  const [subscription, setSubscription] = useState<PushSubscription | null>(null);
+  const [subscription, setSubscription] = useState<PushSubscription | null>(
+    null
+  );
 
   useEffect(() => {
     // Sadece tarayıcı ve service worker destekliyorsa çalış
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
     // Mevcut durumu kontrol et
     checkSubscriptionStatus();
@@ -33,23 +36,27 @@ export default function PushNotificationManager() {
 
   async function checkSubscriptionStatus() {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/',
-        updateViaCache: 'none',
+      const registration = await navigator.serviceWorker.register("/sw.js", {
+        scope: "/",
+        updateViaCache: "none",
       });
 
-      const existingSubscription = await registration.pushManager.getSubscription();
-      
+      const existingSubscription =
+        await registration.pushManager.getSubscription();
+
       // Eğer abone değilse ve izin durumu 'default' ise (henüz sorulmamışsa) banner göster
-      if (!existingSubscription && Notification.permission === 'default') {
+      if (!existingSubscription && Notification.permission === "default") {
         setShowBanner(true);
       } else if (existingSubscription) {
         setSubscription(existingSubscription);
         // Abone ise LocalStorage'ı güncelle (garanti olsun)
-        localStorage.setItem('push_subscription', JSON.stringify(existingSubscription));
+        localStorage.setItem(
+          "push_subscription",
+          JSON.stringify(existingSubscription)
+        );
       }
     } catch (error) {
-      console.error('SW registration failed:', error);
+      console.error("SW registration failed:", error);
     }
   }
 
@@ -60,32 +67,25 @@ export default function PushNotificationManager() {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
-      
+
       setSubscription(sub);
       setShowBanner(false); // Banner'ı kapat
-      
+
       // 1. LocalStorage'a kaydet
-      localStorage.setItem('push_subscription', JSON.stringify(sub));
+      localStorage.setItem("push_subscription", JSON.stringify(sub));
 
-      // 2. Kullanıcı giriş yapmışsa backend'e gönder
-      const storedUser = loadSession();
-      if (storedUser) {
-        // Activity ID'yi bul
-        const params = new URLSearchParams(window.location.search);
-        const activityId = params.get('activity') || localStorage.getItem('activity_id');
+      // 2. Kullanıcı daha önce giriş yapmışsa (UUID varsa) backend'e gönder
+      const userUuid = localStorage.getItem("user_uuid");
+      // Activity ID'yi bul
+      const params = new URLSearchParams(window.location.search);
+      const activityId =
+        params.get("activity") || localStorage.getItem("activity_id");
 
-        await fetch('/api/web-push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            subscription: sub,
-            user: storedUser,
-            activity_id: activityId
-          }),
-        });
+      if (userUuid && activityId) {
+        await saveSubscription(activityId, userUuid, sub);
       }
     } catch (error) {
-      console.error('Failed to subscribe:', error);
+      console.error("Failed to subscribe:", error);
     }
   }
 
@@ -101,11 +101,13 @@ export default function PushNotificationManager() {
             </span>
             <div className="text-sm font-medium">
               Enable notifications
-              <span className="block text-xs text-white/50 font-normal">Stay updated with event news</span>
+              <span className="block text-xs text-white/50 font-normal">
+                Stay updated with event news
+              </span>
             </div>
           </div>
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={() => setShowBanner(false)}
               className="px-3 py-1.5 text-xs text-white/60 hover:text-white transition-colors"
             >
@@ -123,5 +125,3 @@ export default function PushNotificationManager() {
     </div>
   );
 }
-
-

@@ -398,22 +398,8 @@ export default function ChatWindow() {
         }
 
         const effectiveType =
-          recorder.mimeType || recConfig.mimeType || "";
-        
-        let finalType = effectiveType;
-        if (!finalType) {
-          // Fallback: if we intended to record MP4 (Apple), force video/mp4
-          if (recConfig.extension === "mp4") {
-            finalType = "video/mp4";
-          } else {
-            finalType = "video/webm";
-          }
-        }
-
-        // If effectiveType contains codecs parameters, strip them for the Blob type
-        // to avoid playback issues on some devices (especially iOS).
-        const cleanType = finalType.split(";")[0];
-        const blob = new Blob(chunks, { type: cleanType });
+          recorder.mimeType || recConfig.mimeType || "video/webm";
+        const blob = new Blob(chunks, { type: effectiveType });
         const MAX_BYTES = 10 * 1024 * 1024;
         if (blob.size > MAX_BYTES) {
           openAlert(
@@ -1183,7 +1169,6 @@ export default function ChatWindow() {
                   controls
                   autoPlay
                   playsInline
-                  muted
                   className="w-full h-full max-h-[70vh] object-contain"
                 />
               ) : (

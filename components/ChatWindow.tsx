@@ -394,10 +394,21 @@ export default function ChatWindow() {
         }
 
         const effectiveType =
-          recorder.mimeType || recConfig.mimeType || "video/webm";
+          recorder.mimeType || recConfig.mimeType || "";
+        
+        let finalType = effectiveType;
+        if (!finalType) {
+          // Fallback: if we intended to record MP4 (Apple), force video/mp4
+          if (recConfig.extension === "mp4") {
+            finalType = "video/mp4";
+          } else {
+            finalType = "video/webm";
+          }
+        }
+
         // If effectiveType contains codecs parameters, strip them for the Blob type
         // to avoid playback issues on some devices (especially iOS).
-        const cleanType = effectiveType.split(";")[0];
+        const cleanType = finalType.split(";")[0];
         const blob = new Blob(chunks, { type: cleanType });
         const MAX_BYTES = 10 * 1024 * 1024;
         if (blob.size > MAX_BYTES) {
@@ -693,14 +704,12 @@ export default function ChatWindow() {
           e.target.value = "";
           return;
         }
-      } catch {
-        openAlert(
-          "Could not verify video duration. Please try a different file or format.",
-          "Video Error"
-        );
-        URL.revokeObjectURL(objectUrl);
-        e.target.value = "";
-        return;
+      } catch (err) {
+        // iOS or some browsers might fail to load metadata for gallery videos immediately.
+        // Since we already checked the file size (<= 10MB), we'll be lenient here and
+        // allow the video to proceed. The user can verify it in the preview.
+        // eslint-disable-next-line no-console
+        console.warn("Could not verify video duration, proceeding anyway:", err);
       }
     }
 

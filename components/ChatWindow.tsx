@@ -1179,11 +1179,11 @@ export default function ChatWindow() {
             <div className="rounded-xl overflow-hidden border border-white/15 bg-black/70 max-h-[70vh] flex items-center justify-center">
               {pendingAttachment.type === "video" ? (
                 <video
-                  key={pendingAttachment.url}
                   src={pendingAttachment.url}
                   controls
+                  autoPlay
                   playsInline
-                  preload="metadata"
+                  muted
                   className="w-full h-full max-h-[70vh] object-contain"
                 />
               ) : (

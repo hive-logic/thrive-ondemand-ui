@@ -68,6 +68,7 @@ const MessageBubble = memo(
               {props.msg.attachment.type === "video" && (
                 <video
                   controls
+                  playsInline
                   src={props.msg.attachment.url}
                   className="max-w-full rounded-xl border border-white/10"
                 />
@@ -1175,6 +1176,7 @@ export default function ChatWindow() {
                   controls
                   autoPlay
                   playsInline
+                  muted
                   className="w-full h-full max-h-[70vh] object-contain"
                 />
               ) : (

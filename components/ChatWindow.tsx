@@ -68,6 +68,7 @@ const MessageBubble = memo(
               {props.msg.attachment.type === "video" && (
                 <video
                   controls
+                  playsInline
                   src={props.msg.attachment.url}
                   className="max-w-full rounded-xl border border-white/10"
                 />
@@ -216,6 +217,7 @@ export default function ChatWindow() {
     const canCheck = MR && typeof MR.isTypeSupported === "function";
 
     if (isAppleDevice && canCheck) {
+      // Try specific codecs first for better compatibility
       const appleCandidates = [
         "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
         "video/mp4",
@@ -226,7 +228,7 @@ export default function ChatWindow() {
             return { mimeType: c, extension: "mp4" };
           }
         } catch {
-          // ignore and fall back
+          // ignore
         }
       }
       return { extension: "mp4" };
@@ -493,6 +495,8 @@ export default function ChatWindow() {
     return new Promise((resolve, reject) => {
       const video = document.createElement("video");
       video.preload = "metadata";
+      video.playsInline = true;
+      video.muted = true;
 
       const cleanup = () => {
         video.removeAttribute("src");
@@ -690,12 +694,12 @@ export default function ChatWindow() {
           e.target.value = "";
           return;
         }
-      } catch {
+      } catch (err) {
+        // iOS or some browsers might fail to load metadata for gallery videos immediately.
+        // Since we already checked the file size (<= 10MB), we'll be lenient here and
+        // allow the video to proceed. The user can verify it in the preview.
         // eslint-disable-next-line no-console
-        console.error("Video duration could not be read. Selected video was rejected.");
-        URL.revokeObjectURL(objectUrl);
-        e.target.value = "";
-        return;
+        console.warn("Could not verify video duration, proceeding anyway:", err);
       }
     }
 
@@ -1141,17 +1145,7 @@ export default function ChatWindow() {
           <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl rounded-2xl bg-[#111112] border border-white/15 shadow-2xl p-4 sm:p-6 space-y-4 relative">
             <button
               type="button"
-              onClick={() => {
-                if (pendingAttachment?.url) {
-                  try {
-                    URL.revokeObjectURL(pendingAttachment.url);
-                  } catch {
-                    // ignore
-                  }
-                }
-                setPendingAttachment(null);
-                setIsPreviewOpen(false);
-              }}
+              onClick={() => setIsPreviewOpen(false)}
               className="absolute right-2 top-2 text-white/70 hover:text-white p-2"
               aria-label="Close preview"
             >
@@ -1175,13 +1169,13 @@ export default function ChatWindow() {
                   controls
                   autoPlay
                   playsInline
-                  className="w-full h-full max-h-[70vh] object-contain"
+                  className="max-w-full max-h-[70vh] w-auto h-auto mx-auto"
                 />
               ) : (
                 <img
                   src={pendingAttachment.url}
                   alt={pendingAttachment.fileName || "Captured photo"}
-                  className="w-full h-full max-h-[70vh] object-contain"
+                  className="max-w-full max-h-[70vh] w-auto h-auto mx-auto object-contain"
                 />
               )}
             </div>

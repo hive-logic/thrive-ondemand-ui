@@ -1169,13 +1169,13 @@ export default function ChatWindow() {
                   controls
                   autoPlay
                   playsInline
-                  className="w-full h-full max-h-[70vh] object-contain"
+                  className="max-w-full max-h-[70vh] w-auto h-auto mx-auto"
                 />
               ) : (
                 <img
                   src={pendingAttachment.url}
                   alt={pendingAttachment.fileName || "Captured photo"}
-                  className="w-full h-full max-h-[70vh] object-contain"
+                  className="max-w-full max-h-[70vh] w-auto h-auto mx-auto object-contain"
                 />
               )}
             </div>

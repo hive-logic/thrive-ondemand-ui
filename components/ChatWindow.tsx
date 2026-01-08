@@ -217,15 +217,19 @@ export default function ChatWindow() {
     const canCheck = MR && typeof MR.isTypeSupported === "function";
 
     if (isAppleDevice && canCheck) {
-      // iOS/Safari usually records to MP4/H.264 by default or supports it widely.
-      // We avoid specific codec strings like 'avc1.42E01E' because they can cause
-      // issues with playback if the actual recording doesn't match exactly.
-      try {
-        if (MR.isTypeSupported("video/mp4")) {
-          return { mimeType: "video/mp4", extension: "mp4" };
+      // Try specific codecs first for better compatibility
+      const appleCandidates = [
+        "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+        "video/mp4",
+      ];
+      for (const c of appleCandidates) {
+        try {
+          if (MR.isTypeSupported(c)) {
+            return { mimeType: c, extension: "mp4" };
+          }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
       }
       return { extension: "mp4" };
     }
@@ -1175,11 +1179,11 @@ export default function ChatWindow() {
             <div className="rounded-xl overflow-hidden border border-white/15 bg-black/70 max-h-[70vh] flex items-center justify-center">
               {pendingAttachment.type === "video" ? (
                 <video
+                  key={pendingAttachment.url}
                   src={pendingAttachment.url}
                   controls
-                  autoPlay
                   playsInline
-                  muted
+                  preload="metadata"
                   className="w-full h-full max-h-[70vh] object-contain"
                 />
               ) : (

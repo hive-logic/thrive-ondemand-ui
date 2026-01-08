@@ -217,18 +217,15 @@ export default function ChatWindow() {
     const canCheck = MR && typeof MR.isTypeSupported === "function";
 
     if (isAppleDevice && canCheck) {
-      const appleCandidates = [
-        "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-        "video/mp4",
-      ];
-      for (const c of appleCandidates) {
-        try {
-          if (MR.isTypeSupported(c)) {
-            return { mimeType: c, extension: "mp4" };
-          }
-        } catch {
-          // ignore and fall back
+      // iOS/Safari usually records to MP4/H.264 by default or supports it widely.
+      // We avoid specific codec strings like 'avc1.42E01E' because they can cause
+      // issues with playback if the actual recording doesn't match exactly.
+      try {
+        if (MR.isTypeSupported("video/mp4")) {
+          return { mimeType: "video/mp4", extension: "mp4" };
         }
+      } catch {
+        // ignore
       }
       return { extension: "mp4" };
     }
@@ -398,7 +395,10 @@ export default function ChatWindow() {
 
         const effectiveType =
           recorder.mimeType || recConfig.mimeType || "video/webm";
-        const blob = new Blob(chunks, { type: effectiveType });
+        // If effectiveType contains codecs parameters, strip them for the Blob type
+        // to avoid playback issues on some devices (especially iOS).
+        const cleanType = effectiveType.split(";")[0];
+        const blob = new Blob(chunks, { type: cleanType });
         const MAX_BYTES = 10 * 1024 * 1024;
         if (blob.size > MAX_BYTES) {
           openAlert(
@@ -494,6 +494,8 @@ export default function ChatWindow() {
     return new Promise((resolve, reject) => {
       const video = document.createElement("video");
       video.preload = "metadata";
+      video.playsInline = true;
+      video.muted = true;
 
       const cleanup = () => {
         video.removeAttribute("src");
@@ -692,8 +694,10 @@ export default function ChatWindow() {
           return;
         }
       } catch {
-        // eslint-disable-next-line no-console
-        console.error("Video duration could not be read. Selected video was rejected.");
+        openAlert(
+          "Could not verify video duration. Please try a different file or format.",
+          "Video Error"
+        );
         URL.revokeObjectURL(objectUrl);
         e.target.value = "";
         return;
@@ -1142,17 +1146,7 @@ export default function ChatWindow() {
           <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl rounded-2xl bg-[#111112] border border-white/15 shadow-2xl p-4 sm:p-6 space-y-4 relative">
             <button
               type="button"
-              onClick={() => {
-                if (pendingAttachment?.url) {
-                  try {
-                    URL.revokeObjectURL(pendingAttachment.url);
-                  } catch {
-                    // ignore
-                  }
-                }
-                setPendingAttachment(null);
-                setIsPreviewOpen(false);
-              }}
+              onClick={() => setIsPreviewOpen(false)}
               className="absolute right-2 top-2 text-white/70 hover:text-white p-2"
               aria-label="Close preview"
             >

@@ -49,13 +49,38 @@ export default function PushNotificationManager() {
         setShowBanner(true);
       } else if (existingSubscription) {
         setSubscription(existingSubscription);
+        const subscriptionJson = existingSubscription.toJSON();
         localStorage.setItem(
           "push_subscription",
-          JSON.stringify(existingSubscription.toJSON())
+          JSON.stringify(subscriptionJson)
         );
+
+        // Mevcut subscription varsa ve user_uuid varsa, backend'e senkronize et
+        // (Örn: kullanıcı daha önce izin vermiş ama backend'e gitmemiş olabilir)
+        await syncSubscriptionToBackend(subscriptionJson);
       }
     } catch (error) {
       console.error("SW registration failed:", error);
+    }
+  }
+
+  async function syncSubscriptionToBackend(subscriptionJson: PushSubscriptionJSON) {
+    const userUuid = localStorage.getItem("user_uuid");
+    const params = new URLSearchParams(window.location.search);
+    const activityId = params.get("activity") || localStorage.getItem("activity_id");
+
+    // Daha önce bu subscription backend'e gönderilmiş mi kontrol et
+    const lastSyncedSub = localStorage.getItem("push_subscription_synced");
+    const currentSubKey = JSON.stringify(subscriptionJson);
+
+    if (userUuid && activityId && lastSyncedSub !== currentSubKey) {
+      try {
+        await saveSubscription(activityId, userUuid, subscriptionJson);
+        localStorage.setItem("push_subscription_synced", currentSubKey);
+        console.log("[Push] Subscription synced to backend for user:", userUuid);
+      } catch (error) {
+        console.error("[Push] Failed to sync subscription to backend:", error);
+      }
     }
   }
 
@@ -83,9 +108,10 @@ export default function PushNotificationManager() {
 
       if (userUuid && activityId) {
         await saveSubscription(activityId, userUuid, subscriptionJson);
-        console.log("Push subscription sent to backend for user:", userUuid);
+        localStorage.setItem("push_subscription_synced", JSON.stringify(subscriptionJson));
+        console.log("[Push] Subscription sent to backend for user:", userUuid);
       } else {
-        console.log("Push subscription saved locally, will sync after user login");
+        console.log("[Push] Subscription saved locally, will sync after user login. userUuid:", userUuid, "activityId:", activityId);
       }
     } catch (error) {
       console.error("Failed to subscribe:", error);

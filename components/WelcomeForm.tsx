@@ -153,6 +153,8 @@ export default function WelcomeForm() {
         if (storedSub) {
           const subscription = JSON.parse(storedSub);
           await saveSubscription(activityId, userUuid, subscription);
+          localStorage.setItem("push_subscription_synced", storedSub);
+          console.log("[Push] Subscription synced to backend after login");
         }
       } else {
         console.warn("User ID could not be retrieved from backend.");

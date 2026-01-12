@@ -49,10 +49,9 @@ export default function PushNotificationManager() {
         setShowBanner(true);
       } else if (existingSubscription) {
         setSubscription(existingSubscription);
-        // Abone ise LocalStorage'ı güncelle (garanti olsun)
         localStorage.setItem(
           "push_subscription",
-          JSON.stringify(existingSubscription)
+          JSON.stringify(existingSubscription.toJSON())
         );
       }
     } catch (error) {
@@ -71,8 +70,9 @@ export default function PushNotificationManager() {
       setSubscription(sub);
       setShowBanner(false); // Banner'ı kapat
 
-      // 1. LocalStorage'a kaydet
-      localStorage.setItem("push_subscription", JSON.stringify(sub));
+      // 1. LocalStorage'a kaydet (toJSON() ile serialize et)
+      const subscriptionJson = sub.toJSON();
+      localStorage.setItem("push_subscription", JSON.stringify(subscriptionJson));
 
       // 2. Kullanıcı daha önce giriş yapmışsa (UUID varsa) backend'e gönder
       const userUuid = localStorage.getItem("user_uuid");
@@ -82,7 +82,10 @@ export default function PushNotificationManager() {
         params.get("activity") || localStorage.getItem("activity_id");
 
       if (userUuid && activityId) {
-        await saveSubscription(activityId, userUuid, sub);
+        await saveSubscription(activityId, userUuid, subscriptionJson);
+        console.log("Push subscription sent to backend for user:", userUuid);
+      } else {
+        console.log("Push subscription saved locally, will sync after user login");
       }
     } catch (error) {
       console.error("Failed to subscribe:", error);

@@ -27,8 +27,12 @@ export async function checkUserId(activityId: string, email: string): Promise<st
   }
 }
 
-export async function saveSubscription(activityId: string, userId: string, subscription: PushSubscription) {
+export async function saveSubscription(activityId: string, userId: string, subscription: PushSubscription | PushSubscriptionJSON) {
   try {
+    const subscriptionData = 'toJSON' in subscription && typeof subscription.toJSON === 'function' 
+      ? subscription.toJSON() 
+      : subscription;
+
     const response = await fetch(`${API_BASE_URL}/v1/save_subscription?activity=${activityId}`, {
       method: 'POST',
       headers: {
@@ -37,15 +41,17 @@ export async function saveSubscription(activityId: string, userId: string, subsc
       },
       body: JSON.stringify({
         user_id: userId,
-        subscription: subscription,
+        subscription: subscriptionData,
       }),
     });
 
     if (!response.ok) {
-      throw new Error('Save Subscription failed');
+      const errorText = await response.text();
+      console.error('Save Subscription failed:', response.status, errorText);
+      throw new Error(`Save Subscription failed: ${response.status}`);
     }
 
-    console.log('Subscription saved successfully to backend.');
+    console.log('Push subscription saved to backend for user:', userId);
   } catch (error) {
     console.error('Save Subscription error:', error);
   }

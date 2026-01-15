@@ -161,7 +161,7 @@ export default function WelcomeForm() {
       if (userUuid) {
         localStorage.setItem("user_uuid", userUuid); // UUID'yi sakla
 
-        if (subscription) {
+        if (subscription && storedSub) {
           localStorage.setItem("push_subscription_synced", storedSub);
           console.log("[Push] Subscription sent with create_user");
         }

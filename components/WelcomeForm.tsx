@@ -140,10 +140,20 @@ export default function WelcomeForm() {
       createdAt: Date.now(),
       location,
     };
-    saveSession(session);
+    try {
+      saveSession(session);
+    } catch (error) {
+      console.warn("[Session] Failed to save session:", error);
+    }
 
-    const storedSub = localStorage.getItem("push_subscription");
-    const subscription = storedSub ? JSON.parse(storedSub) : null;
+    let storedSub: string | null = null;
+    let subscription: PushSubscriptionJSON | null = null;
+    try {
+      storedSub = localStorage.getItem("push_subscription");
+      subscription = storedSub ? JSON.parse(storedSub) : null;
+    } catch (error) {
+      console.warn("[Push] Failed to parse stored subscription:", error);
+    }
 
     // Backend'de user kaydi olustur
     try {

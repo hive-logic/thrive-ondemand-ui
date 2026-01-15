@@ -27,6 +27,57 @@ export async function checkUserId(activityId: string, email: string): Promise<st
   }
 }
 
+type CreateUserResponse =
+  | string
+  | {
+      user_id?: string;
+      userId?: string;
+      id?: string;
+      uuid?: string;
+    };
+
+export async function createUser(
+  activityId: string,
+  name: string,
+  email: string,
+  details: Record<string, unknown>,
+  subscription: PushSubscriptionJSON | null
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/v1/create_user?activity=${activityId}`,
+      {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          activity_id: activityId,
+          name,
+          email,
+          details,
+          subscription,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Create User failed:', response.status, errorText);
+      return null;
+    }
+
+    const data = (await response.json()) as CreateUserResponse;
+    if (typeof data === 'string') return data;
+    const userId = data.user_id ?? data.userId ?? data.id ?? data.uuid ?? null;
+    return typeof userId === 'string' ? userId : null;
+  } catch (error) {
+    console.error('Create User error:', error);
+    return null;
+  }
+}
+
 export async function saveSubscription(activityId: string, userId: string, subscription: PushSubscription | PushSubscriptionJSON) {
   try {
     const subscriptionData = 'toJSON' in subscription && typeof subscription.toJSON === 'function' 

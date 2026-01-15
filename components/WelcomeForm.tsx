@@ -5,7 +5,7 @@ import { loadSession, saveSession, UserSession } from "@/lib/session";
 import { getLocationWithAddress } from "@/lib/geolocation";
 import { useRouter } from "next/navigation";
 import { checkActivityValidity, ActivityStatus } from "@/lib/activity";
-import { checkUserId, saveSubscription } from "@/lib/backend-api";
+import { createUser } from "@/lib/backend-api";
 
 function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -142,19 +142,28 @@ export default function WelcomeForm() {
     };
     saveSession(session);
 
-    // 1. Backend'den User ID (UUID) al
+    const storedSub = localStorage.getItem("push_subscription");
+    const subscription = storedSub ? JSON.parse(storedSub) : null;
+
+    // Backend'de user kaydi olustur
     try {
-      const userUuid = await checkUserId(activityId, email.trim());
+      const userUuid = await createUser(
+        activityId,
+        session.name,
+        session.email,
+        {
+          session_id: session.session_id,
+          createdAt: session.createdAt,
+          location: session.location,
+        },
+        subscription
+      );
       if (userUuid) {
         localStorage.setItem("user_uuid", userUuid); // UUID'yi sakla
 
-        // 2. Eğer push aboneliği varsa backend'e kaydet (UUID ile)
-        const storedSub = localStorage.getItem("push_subscription");
-        if (storedSub) {
-          const subscription = JSON.parse(storedSub);
-          await saveSubscription(activityId, userUuid, subscription);
+        if (subscription) {
           localStorage.setItem("push_subscription_synced", storedSub);
-          console.log("[Push] Subscription synced to backend after login");
+          console.log("[Push] Subscription sent with create_user");
         }
       } else {
         console.warn("User ID could not be retrieved from backend.");

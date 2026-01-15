@@ -1133,6 +1133,7 @@ export default function ChatWindow() {
             disabled={
               sending || (!input.trim() && !pendingAttachment) || !connected
             }
+            onMouseDown={(e) => e.preventDefault()}
             className="btn-primary h-12 md:h-12 inline-flex items-center justify-center px-4 md:px-5 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation"
             aria-label="Send"
           >

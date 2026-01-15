@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { VAPID_PUBLIC_KEY } from "@/lib/push-config";
-import { loadSession } from "@/lib/session";
 import { saveSubscription } from "@/lib/backend-api";
 
+// Helper: URL-safe Base64 to Uint8Array
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
@@ -22,15 +22,23 @@ function urlBase64ToUint8Array(base64String: string) {
 
 export default function PushNotificationManager() {
   const [showBanner, setShowBanner] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [subscription, setSubscription] = useState<PushSubscription | null>(
     null
   );
 
   useEffect(() => {
-    // Sadece tarayıcı ve service worker destekliyorsa çalış
+    // 1. VAPID Key kontrolü: Yoksa veya boşsa hiç çalışma (Banner çıkmasın)
+    if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.trim() === "") {
+      // eslint-disable-next-line no-console
+      console.warn("[Push] VAPID_PUBLIC_KEY is missing. Notifications disabled.");
+      return;
+    }
+
+    // 2. Browser desteği kontrolü
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
-    // Mevcut durumu kontrol et
+    // 3. Mevcut abonelik durumunu kontrol et
     checkSubscriptionStatus();
   }, []);
 
@@ -44,7 +52,7 @@ export default function PushNotificationManager() {
       const existingSubscription =
         await registration.pushManager.getSubscription();
 
-      // Eğer abone değilse ve izin durumu 'default' ise (henüz sorulmamışsa) banner göster
+      // Abone değilse ve izin durumu 'default' ise (henüz sorulmamışsa) banner göster
       if (!existingSubscription && Notification.permission === "default") {
         setShowBanner(true);
       } else if (existingSubscription) {
@@ -60,6 +68,7 @@ export default function PushNotificationManager() {
         await syncSubscriptionToBackend(subscriptionJson);
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error("SW registration failed:", error);
     }
   }
@@ -86,7 +95,16 @@ export default function PushNotificationManager() {
 
   async function subscribeToPush() {
     try {
+      // Güvenlik: Key kontrolü (Tekrar)
+      if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.trim() === "") {
+        // eslint-disable-next-line no-console
+        console.error("Cannot subscribe: Missing VAPID Public Key");
+        return;
+      }
+
       const registration = await navigator.serviceWorker.ready;
+      
+      // Subscribe çağrısı
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
@@ -101,7 +119,8 @@ export default function PushNotificationManager() {
 
       // 2. Kullanıcı daha önce giriş yapmışsa (UUID varsa) backend'e gönder
       const userUuid = localStorage.getItem("user_uuid");
-      // Activity ID'yi bul
+      
+      // Activity ID'yi bul (URL'den veya LocalStorage'dan)
       const params = new URLSearchParams(window.location.search);
       const activityId =
         params.get("activity") || localStorage.getItem("activity_id");
@@ -114,6 +133,7 @@ export default function PushNotificationManager() {
         console.log("[Push] Subscription saved locally, will sync after user login. userUuid:", userUuid, "activityId:", activityId);
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error("Failed to subscribe:", error);
     }
   }

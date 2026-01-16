@@ -135,7 +135,12 @@ export default function WelcomeForm() {
 
     console.log("[WelcomeForm] Starting user registration for:", name.trim(), email.trim());
 
-    // 1. Push subscription'ı oku (varsa)
+    // 1. Önce lokasyon al
+    console.log("[WelcomeForm] Getting location...");
+    const location = await getLocationWithAddress(email);
+    console.log("[WelcomeForm] Location result:", location);
+
+    // 2. Push subscription'ı oku (varsa)
     let subscription: PushSubscriptionJSON | null = null;
     try {
       const storedSub = localStorage.getItem("push_subscription");
@@ -147,9 +152,18 @@ export default function WelcomeForm() {
       console.warn("[WelcomeForm] Failed to parse stored subscription:", error);
     }
 
-    // 2. Backend'e kullanıcı kaydı yap (konum beklenmeden!)
+    // 3. Backend'e kullanıcı kaydı yap (lokasyon dahil)
     const sessionId = crypto.randomUUID();
     const createdAt = Date.now();
+    
+    // Details objesi oluştur - lokasyon varsa ekle
+    const details: Record<string, unknown> = {
+      session_id: sessionId,
+      createdAt: createdAt,
+    };
+    if (location) {
+      details.location = location;
+    }
     
     console.log("[WelcomeForm] Calling createUser API...");
     try {
@@ -157,10 +171,7 @@ export default function WelcomeForm() {
         activityId,
         name.trim(),
         email.trim(),
-        {
-          session_id: sessionId,
-          createdAt: createdAt,
-        },
+        details,
         subscription
       );
       
@@ -180,11 +191,6 @@ export default function WelcomeForm() {
     } catch (error) {
       console.error("[WelcomeForm] createUser failed:", error);
     }
-
-    // 3. Konum al (bu adım opsiyonel olarak bekleyebilir)
-    console.log("[WelcomeForm] Getting location...");
-    const location = await getLocationWithAddress(email);
-    console.log("[WelcomeForm] Location result:", location);
 
     // 4. Session'ı kaydet
     const session: UserSession = {
@@ -208,7 +214,7 @@ export default function WelcomeForm() {
       console.warn("[WelcomeForm] Failed to save session:", error);
     }
 
-    // 5. Konum yoksa hata göster ama kullanıcı kaydı zaten yapıldı
+    // 5. Konum yoksa hata göster - kullanıcı devam edemez
     if (!location) {
       setSubmitting(false);
       setLocationError("Location permission is required to continue.");

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { VAPID_PUBLIC_KEY } from "@/lib/push-config";
-import { saveSubscription } from "@/lib/backend-api";
+import { checkUserId, saveSubscription } from "@/lib/backend-api";
+import { loadSession } from "@/lib/session";
 
 // Helper: URL-safe Base64 to Uint8Array
 function urlBase64ToUint8Array(base64String: string) {
@@ -73,10 +74,29 @@ export default function PushNotificationManager() {
     }
   }
 
-  async function syncSubscriptionToBackend(subscriptionJson: PushSubscriptionJSON) {
-    const userUuid = localStorage.getItem("user_uuid");
+  function getActivityId(): string | null {
     const params = new URLSearchParams(window.location.search);
-    const activityId = params.get("activity") || localStorage.getItem("activity_id");
+    return params.get("activity") || localStorage.getItem("activity_id");
+  }
+
+  async function resolveUserUuid(activityId: string): Promise<string | null> {
+    const existing = localStorage.getItem("user_uuid");
+    if (existing) return existing;
+
+    const session = loadSession();
+    const email = session?.email;
+    if (!email) return null;
+
+    const userUuid = await checkUserId(activityId, email);
+    if (userUuid) {
+      localStorage.setItem("user_uuid", userUuid);
+    }
+    return userUuid;
+  }
+
+  async function syncSubscriptionToBackend(subscriptionJson: PushSubscriptionJSON) {
+    const activityId = getActivityId();
+    const userUuid = activityId ? await resolveUserUuid(activityId) : null;
 
     // Daha önce bu subscription backend'e gönderilmiş mi kontrol et
     const lastSyncedSub = localStorage.getItem("push_subscription_synced");
@@ -118,19 +138,21 @@ export default function PushNotificationManager() {
       localStorage.setItem("push_subscription", JSON.stringify(subscriptionJson));
 
       // 2. Kullanıcı daha önce giriş yapmışsa (UUID varsa) backend'e gönder
-      const userUuid = localStorage.getItem("user_uuid");
-      
       // Activity ID'yi bul (URL'den veya LocalStorage'dan)
-      const params = new URLSearchParams(window.location.search);
-      const activityId =
-        params.get("activity") || localStorage.getItem("activity_id");
+      const activityId = getActivityId();
+      const userUuid = activityId ? await resolveUserUuid(activityId) : null;
 
       if (userUuid && activityId) {
         await saveSubscription(activityId, userUuid, subscriptionJson);
         localStorage.setItem("push_subscription_synced", JSON.stringify(subscriptionJson));
         console.log("[Push] Subscription sent to backend for user:", userUuid);
       } else {
-        console.log("[Push] Subscription saved locally, will sync after user login. userUuid:", userUuid, "activityId:", activityId);
+        console.log(
+          "[Push] Subscription saved locally, will sync after user login. userUuid:",
+          userUuid,
+          "activityId:",
+          activityId
+        );
       }
     } catch (error) {
       // eslint-disable-next-line no-console

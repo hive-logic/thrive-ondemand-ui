@@ -128,17 +128,12 @@ export default function WelcomeForm() {
     } catch {}
 
     const location = await getLocationWithAddress(email);
-    if (!location) {
-      setSubmitting(false);
-      setLocationError("Location permission is required to continue.");
-      return;
-    }
     const session: UserSession = {
       session_id: crypto.randomUUID(),
       name: name.trim(),
       email: email.trim(),
       createdAt: Date.now(),
-      location,
+      location: location ?? undefined,
     };
     try {
       saveSession(session);
@@ -170,6 +165,12 @@ export default function WelcomeForm() {
       );
       if (userUuid) {
         localStorage.setItem("user_uuid", userUuid); // UUID'yi sakla
+        session.user_uuid = userUuid;
+        try {
+          saveSession(session);
+        } catch (error) {
+          console.warn("[Session] Failed to update session with UUID:", error);
+        }
 
         if (subscription && storedSub) {
           localStorage.setItem("push_subscription_synced", storedSub);
@@ -180,6 +181,12 @@ export default function WelcomeForm() {
       }
     } catch (e) {
       console.error("Failed to sync with backend:", e);
+    }
+
+    if (!location) {
+      setSubmitting(false);
+      setLocationError("Location permission is required to continue.");
+      return;
     }
 
     router.replace(`/chat?activity=${encodeURIComponent(activityId)}`);

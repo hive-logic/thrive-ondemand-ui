@@ -1,5 +1,6 @@
 export type UserSession = {
   session_id: string;
+  user_uuid?: string;
   name: string;
   email: string;
   createdAt: number;

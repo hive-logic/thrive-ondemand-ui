@@ -119,7 +119,13 @@ export default function WelcomeForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (disabled || activityStatus !== "active" || !activityId) return;
+    console.log("[WelcomeForm] handleSubmit called");
+    
+    if (disabled || activityStatus !== "active" || !activityId) {
+      console.log("[WelcomeForm] Early return - disabled:", disabled, "activityStatus:", activityStatus, "activityId:", activityId);
+      return;
+    }
+    
     setSubmitting(true);
     setLocationError(null);
 
@@ -127,68 +133,90 @@ export default function WelcomeForm() {
       window.localStorage.setItem("activity_id", activityId);
     } catch {}
 
-    const location = await getLocationWithAddress(email);
-    const session: UserSession = {
-      session_id: crypto.randomUUID(),
-      name: name.trim(),
-      email: email.trim(),
-      createdAt: Date.now(),
-      location: location ?? undefined,
-    };
-    try {
-      saveSession(session);
-    } catch (error) {
-      console.warn("[Session] Failed to save session:", error);
-    }
+    console.log("[WelcomeForm] Starting user registration for:", name.trim(), email.trim());
 
-    let storedSub: string | null = null;
+    // 1. Push subscription'ı oku (varsa)
     let subscription: PushSubscriptionJSON | null = null;
     try {
-      storedSub = localStorage.getItem("push_subscription");
-      subscription = storedSub ? JSON.parse(storedSub) : null;
+      const storedSub = localStorage.getItem("push_subscription");
+      if (storedSub) {
+        subscription = JSON.parse(storedSub);
+        console.log("[WelcomeForm] Found existing push subscription");
+      }
     } catch (error) {
-      console.warn("[Push] Failed to parse stored subscription:", error);
+      console.warn("[WelcomeForm] Failed to parse stored subscription:", error);
     }
 
-    // Backend'de user kaydi olustur
+    // 2. Backend'e kullanıcı kaydı yap (konum beklenmeden!)
+    const sessionId = crypto.randomUUID();
+    const createdAt = Date.now();
+    
+    console.log("[WelcomeForm] Calling createUser API...");
     try {
       const userUuid = await createUser(
         activityId,
-        session.name,
-        session.email,
+        name.trim(),
+        email.trim(),
         {
-          session_id: session.session_id,
-          createdAt: session.createdAt,
-          location: session.location,
+          session_id: sessionId,
+          createdAt: createdAt,
         },
         subscription
       );
+      
+      console.log("[WelcomeForm] createUser response:", userUuid);
+      
       if (userUuid) {
-        localStorage.setItem("user_uuid", userUuid); // UUID'yi sakla
-        session.user_uuid = userUuid;
-        try {
-          saveSession(session);
-        } catch (error) {
-          console.warn("[Session] Failed to update session with UUID:", error);
-        }
-
-        if (subscription && storedSub) {
-          localStorage.setItem("push_subscription_synced", storedSub);
-          console.log("[Push] Subscription sent with create_user");
+        localStorage.setItem("user_uuid", userUuid);
+        console.log("[WelcomeForm] User UUID saved:", userUuid);
+        
+        if (subscription) {
+          localStorage.setItem("push_subscription_synced", JSON.stringify(subscription));
+          console.log("[WelcomeForm] Push subscription marked as synced");
         }
       } else {
-        console.warn("User ID could not be retrieved from backend.");
+        console.warn("[WelcomeForm] User UUID not received from backend");
       }
-    } catch (e) {
-      console.error("Failed to sync with backend:", e);
+    } catch (error) {
+      console.error("[WelcomeForm] createUser failed:", error);
     }
 
+    // 3. Konum al (bu adım opsiyonel olarak bekleyebilir)
+    console.log("[WelcomeForm] Getting location...");
+    const location = await getLocationWithAddress(email);
+    console.log("[WelcomeForm] Location result:", location);
+
+    // 4. Session'ı kaydet
+    const session: UserSession = {
+      session_id: sessionId,
+      name: name.trim(),
+      email: email.trim(),
+      createdAt: createdAt,
+      location: location ?? undefined,
+    };
+    
+    // user_uuid varsa session'a ekle
+    const savedUuid = localStorage.getItem("user_uuid");
+    if (savedUuid) {
+      session.user_uuid = savedUuid;
+    }
+    
+    try {
+      saveSession(session);
+      console.log("[WelcomeForm] Session saved");
+    } catch (error) {
+      console.warn("[WelcomeForm] Failed to save session:", error);
+    }
+
+    // 5. Konum yoksa hata göster ama kullanıcı kaydı zaten yapıldı
     if (!location) {
       setSubmitting(false);
       setLocationError("Location permission is required to continue.");
       return;
     }
 
+    // 6. Chat sayfasına yönlendir
+    console.log("[WelcomeForm] Redirecting to chat...");
     router.replace(`/chat?activity=${encodeURIComponent(activityId)}`);
   }
 
@@ -218,7 +246,7 @@ export default function WelcomeForm() {
   if (activityStatus === "invalid") {
     return (
       <EventStatusCard
-        title="There’s no such event."
+        title="There's no such event."
         message="The link or QR code seems incorrect. Please check it and try again."
         tone="error"
       />

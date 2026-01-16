@@ -20,21 +20,12 @@ export async function checkUserId(activityId: string, email: string): Promise<st
     }
 
     const data = await response.json();
-    return data; // API direkt string (UUID) mi dönüyor yoksa JSON obje mi? Şimdilik data diyelim.
+    return data;
   } catch (error) {
     console.error('Check User ID error:', error);
     return null;
   }
 }
-
-type CreateUserResponse =
-  | string
-  | {
-      user_id?: string;
-      userId?: string;
-      id?: string;
-      uuid?: string;
-    };
 
 export async function createUser(
   activityId: string,
@@ -43,47 +34,63 @@ export async function createUser(
   details: Record<string, unknown>,
   subscription: PushSubscriptionJSON | null
 ): Promise<string | null> {
+  const url = `${API_BASE_URL}/v1/create_user?activity=${activityId}`;
+  const payload = {
+    activity_id: activityId,
+    name,
+    email,
+    details,
+    subscription,
+  };
+  
+  console.log('[createUser] Sending request to:', url);
+  console.log('[createUser] Payload:', JSON.stringify(payload, null, 2));
+  
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/v1/create_user?activity=${activityId}`,
-      {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          activity_id: activityId,
-          name,
-          email,
-          details,
-          subscription,
-        }),
-      }
-    );
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    console.log('[createUser] Response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Create User failed:', response.status, errorText);
+      console.error('[createUser] Failed:', response.status, errorText);
       return null;
     }
 
-    const data = (await response.json()) as CreateUserResponse;
-    if (typeof data === 'string') return data;
-    const userId = data.user_id ?? data.userId ?? data.id ?? data.uuid ?? null;
-    return typeof userId === 'string' ? userId : null;
+    const responseText = await response.text();
+    console.log('[createUser] Response body:', responseText);
+    
+    // Try to parse as JSON, if it fails treat as plain string UUID
+    try {
+      const data = JSON.parse(responseText);
+      if (typeof data === 'string') return data;
+      const userId = data.user_id ?? data.userId ?? data.id ?? data.uuid ?? null;
+      return typeof userId === 'string' ? userId : null;
+    } catch {
+      // Response is plain string (UUID)
+      return responseText.trim() || null;
+    }
   } catch (error) {
-    console.error('Create User error:', error);
+    console.error('[createUser] Error:', error);
     return null;
   }
 }
 
 export async function saveSubscription(activityId: string, userId: string, subscription: PushSubscription | PushSubscriptionJSON) {
-  try {
-    const subscriptionData = 'toJSON' in subscription && typeof subscription.toJSON === 'function' 
-      ? subscription.toJSON() 
-      : subscription;
+  const subscriptionData = 'toJSON' in subscription && typeof subscription.toJSON === 'function' 
+    ? subscription.toJSON() 
+    : subscription;
 
+  console.log('[saveSubscription] Sending request for user:', userId);
+
+  try {
     const response = await fetch(`${API_BASE_URL}/v1/save_subscription?activity=${activityId}`, {
       method: 'POST',
       headers: {
@@ -98,13 +105,13 @@ export async function saveSubscription(activityId: string, userId: string, subsc
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Save Subscription failed:', response.status, errorText);
+      console.error('[saveSubscription] Failed:', response.status, errorText);
       throw new Error(`Save Subscription failed: ${response.status}`);
     }
 
-    console.log('Push subscription saved to backend for user:', userId);
+    console.log('[saveSubscription] Success for user:', userId);
   } catch (error) {
-    console.error('Save Subscription error:', error);
+    console.error('[saveSubscription] Error:', error);
+    throw error;
   }
 }
-

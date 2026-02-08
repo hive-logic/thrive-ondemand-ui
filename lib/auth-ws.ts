@@ -14,6 +14,10 @@ const AGENT_HOST =
 let authSocket: WebSocket | null = null;
 let retries = 0;
 let cachedClientId: string | null = null;
+let pingIntervalId: ReturnType<typeof setInterval> | null = null;
+
+// Ping interval in ms - 20 seconds (most load balancers have 30-60s timeout)
+const PING_INTERVAL = 20000;
 
 // Session ID storage key - persistent across component mounts
 const SESSION_ID_KEY = "auth_chat_session_id";
@@ -119,6 +123,9 @@ function connectAuth(): WebSocket {
         return authSocket;
     }
 
+    // Stop any existing ping interval
+    stopPing();
+
     try {
         const url = getAuthWsUrl();
         // eslint-disable-next-line no-console
@@ -130,9 +137,13 @@ function connectAuth(): WebSocket {
             // eslint-disable-next-line no-console
             console.log("Auth WS connected with clientId:", getAuthClientId());
             subscribers.forEach((s) => s.onOpen?.());
+            // Start keepalive ping
+            startPing();
         });
 
         authSocket.addEventListener("close", (ev: CloseEvent) => {
+            // Stop ping on close
+            stopPing();
             // eslint-disable-next-line no-console
             console.log("Auth WS disconnected", {
                 code: ev.code,
@@ -157,6 +168,36 @@ function connectAuth(): WebSocket {
     }
 
     return authSocket!;
+}
+
+/**
+ * Start periodic ping to keep connection alive
+ */
+function startPing(): void {
+    if (pingIntervalId) return;
+
+    pingIntervalId = setInterval(() => {
+        if (authSocket && authSocket.readyState === WebSocket.OPEN) {
+            try {
+                // Send a ping message - backend should ignore or echo this
+                authSocket.send(JSON.stringify({ type: "ping", timestamp: Date.now() }));
+                // eslint-disable-next-line no-console
+                console.log("WS ping sent");
+            } catch {
+                // ignore errors during ping
+            }
+        }
+    }, PING_INTERVAL);
+}
+
+/**
+ * Stop the ping interval
+ */
+function stopPing(): void {
+    if (pingIntervalId) {
+        clearInterval(pingIntervalId);
+        pingIntervalId = null;
+    }
 }
 
 function retryAuthConnect() {

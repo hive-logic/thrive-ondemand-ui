@@ -130,7 +130,7 @@ export function getActivityIdFromUrl(): string {
     if (fromUrl && fromUrl.trim()) {
       try {
         window.localStorage.setItem("activity_id", fromUrl);
-      } catch {}
+      } catch { }
       return fromUrl;
     }
     const stored = window.localStorage.getItem("activity_id");
@@ -158,5 +158,73 @@ export function loadOrCreateChatSessionId(): string {
     return s;
   } catch {
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+}
+
+/**
+ * Clear all public user data from localStorage and reset WebSocket connection
+ * Used for "logout" functionality for public users
+ */
+export function clearPublicUserData(): void {
+  // Close existing WebSocket connection
+  if (socket) {
+    try {
+      socket.close();
+    } catch {
+      // ignore
+    }
+    socket = null;
+  }
+
+  // Reset cached values
+  cachedClientId = null;
+  retries = 0;
+  subscribers.clear();
+
+  // Clear localStorage if available
+  if (typeof window !== "undefined") {
+    try {
+      // Public user keys to clear
+      const keysToRemove = [
+        "ws_client_id",           // WebSocket client ID
+        "activity_id",            // Activity ID
+        "chat_session_id",        // Chat session ID
+        "chat_session",           // Legacy session key
+        "chat_history",           // Chat history if stored
+        "user_name",              // User display name
+        "user_email",             // User email
+      ];
+
+      keysToRemove.forEach((key) => {
+        window.localStorage.removeItem(key);
+      });
+
+      // Also clear any keys that start with "chat_session_" (dynamic session keys)
+      const allKeys = Object.keys(window.localStorage);
+      allKeys.forEach((key) => {
+        if (key.startsWith("chat_session_")) {
+          window.localStorage.removeItem(key);
+        }
+      });
+
+      // eslint-disable-next-line no-console
+      console.log("Public user data cleared");
+    } catch {
+      // ignore localStorage errors
+    }
+  }
+}
+
+/**
+ * Disconnect WebSocket without clearing user data
+ */
+export function disconnectWS(): void {
+  if (socket) {
+    try {
+      socket.close();
+    } catch {
+      // ignore
+    }
+    socket = null;
   }
 }

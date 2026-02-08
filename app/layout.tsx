@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import IOSInstallPrompt from '@/components/IOSInstallPrompt';
 import ManifestLink from '@/components/ManifestLink';
 import PushNotificationManager from '@/components/PushNotificationManager';
+import { AuthProvider } from '@/components/AuthContext';
 import { Suspense } from 'react';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -41,11 +42,10 @@ export default function RootLayout(props: { children: React.ReactNode }) {
         </Suspense>
         <PushNotificationManager />
         <IOSInstallPrompt />
-        <div className="min-h-screen">{props.children}</div>
+        <AuthProvider>
+          <div className="min-h-screen">{props.children}</div>
+        </AuthProvider>
       </body>
     </html>
   );
 }
-
-
-

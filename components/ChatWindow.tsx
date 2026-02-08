@@ -3,7 +3,7 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { loadSession, UserSession } from "@/lib/session";
 import { useRouter } from "next/navigation";
-import { getWS, getActivityIdFromUrl, isWSOpen, subscribeWS } from "@/lib/ws";
+import { getWS, getActivityIdFromUrl, isWSOpen, subscribeWS, clearPublicUserData } from "@/lib/ws";
 
 type MessageAttachment = {
   type: "image" | "video";
@@ -24,15 +24,15 @@ type PendingAttachment = MessageAttachment & {
 
 type AlertState =
   | {
-      kind: "alert";
-      title?: string;
-      message: string;
-    }
+    kind: "alert";
+    title?: string;
+    message: string;
+  }
   | {
-      kind: "camera-choice";
-      title?: string;
-      message: string;
-    };
+    kind: "camera-choice";
+    title?: string;
+    message: string;
+  };
 
 type MessageBubbleProps = {
   msg: Message;
@@ -44,16 +44,14 @@ const MessageBubble = memo(
     const isUser = props.msg.role === "user";
     return (
       <div
-        className={`flex ${isUser ? "justify-end" : "justify-start"} ${
-          props.isLast ? "message-in" : ""
-        }`}
+        className={`flex ${isUser ? "justify-end" : "justify-start"} ${props.isLast ? "message-in" : ""
+          }`}
       >
         <div
-          className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${
-            isUser
+          className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${isUser
               ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
               : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
-          }`}
+            }`}
         >
           <p className="whitespace-pre-wrap">{props.msg.content}</p>
           {props.msg.attachment && (
@@ -410,9 +408,8 @@ export default function ChatWindow() {
           return;
         }
 
-        const fileName = `recorded-${Date.now()}.${
-          recConfig.extension === "mp4" ? "mp4" : "webm"
-        }`;
+        const fileName = `recorded-${Date.now()}.${recConfig.extension === "mp4" ? "mp4" : "webm"
+          }`;
         const file = new File([blob], fileName, {
           type: blob.type || effectiveType,
         });
@@ -536,10 +533,10 @@ export default function ChatWindow() {
     const attachmentForMessage: MessageAttachment | undefined =
       attachmentToSend
         ? {
-            type: attachmentToSend.type,
-            url: attachmentToSend.url,
-            fileName: attachmentToSend.fileName,
-          }
+          type: attachmentToSend.type,
+          url: attachmentToSend.url,
+          fileName: attachmentToSend.fileName,
+        }
         : undefined;
 
     const userMsg: Message = {
@@ -919,22 +916,31 @@ export default function ChatWindow() {
       <div className="flex items-center gap-3 px-4 md:px-6 py-4 border-b border-white/10">
         <div className="flex items-center gap-2">
           <span
-            className={`h-2.5 w-2.5 rounded-full ${
-              connected ? "bg-emerald-400" : "bg-red-400"
-            }`}
+            className={`h-2.5 w-2.5 rounded-full ${connected ? "bg-emerald-400" : "bg-red-400"
+              }`}
             aria-label={connected ? "Connected" : "Disconnected"}
           />
           <div className="text-sm font-semibold">VARCA</div>
         </div>
         {(!connected || locationText) && (
-          <div className="ml-auto text-xs text-white/60 truncate">
+          <div className="text-xs text-white/60 truncate">
             {!connected
               ? "Reconnecting…"
               : locationText
-              ? `(${locationText})`
-              : ""}
+                ? `(${locationText})`
+                : ""}
           </div>
         )}
+        <button
+          onClick={() => {
+            clearPublicUserData();
+            router.replace("/");
+          }}
+          className="ml-auto px-3 py-1.5 text-xs font-medium rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors border border-white/10"
+          title="End session and clear data"
+        >
+          Exit
+        </button>
       </div>
 
       <div
@@ -1036,10 +1042,10 @@ export default function ChatWindow() {
                   className="flex items-center justify-center h-8 w-8 rounded-full border border-white/25 text-white/70 hover:text-white hover:bg-white/5"
                   aria-label="Preview"
                 >
-                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                     <circle cx="12" cy="12" r="3"></circle>
-                   </svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
                 </button>
                 <button
                   type="button"

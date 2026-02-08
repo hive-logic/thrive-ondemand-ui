@@ -38,12 +38,16 @@ const DOCUMENT_REF_REGEX = /\(document::([a-f0-9-]{36})\)/gi;
 
 /**
  * Download/view a file from Directus with authentication
+ * Opens window immediately to avoid popup blocker, then loads content
  */
-async function downloadDocument(fileId: string): Promise<void> {
+async function downloadDocument(fileId: string, setLoading?: (loading: boolean) => void): Promise<void> {
+    setLoading?.(true);
+
     try {
         const token = getStoredAccessToken();
         if (!token) {
             alert("Please log in to view documents.");
+            setLoading?.(false);
             return;
         }
 
@@ -64,18 +68,21 @@ async function downloadDocument(fileId: string): Promise<void> {
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
 
-        // For PDFs and images, open in new tab; for others, trigger download
+        // Use anchor element with download attribute - works better on mobile
+        const link = document.createElement("a");
+        link.href = blobUrl;
+
+        // For PDFs and images, try to open inline; for others, force download
         if (contentType.includes("pdf") || contentType.includes("image")) {
-            window.open(blobUrl, "_blank");
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
         } else {
-            // Create a download link
-            const link = document.createElement("a");
-            link.href = blobUrl;
             link.download = `document-${fileId}`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
         }
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
         // Clean up blob URL after a delay
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
@@ -83,6 +90,8 @@ async function downloadDocument(fileId: string): Promise<void> {
         // eslint-disable-next-line no-console
         console.error("Failed to download document:", error);
         alert("Failed to download document. Please try again.");
+    } finally {
+        setLoading?.(false);
     }
 }
 
@@ -90,21 +99,35 @@ async function downloadDocument(fileId: string): Promise<void> {
  * Component to render a document download button
  */
 function DocumentLink({ fileId }: { fileId: string }) {
-    const handleClick = (e: React.MouseEvent) => {
+    const [loading, setLoading] = useState(false);
+
+    const handleClick = async (e: React.MouseEvent) => {
         e.preventDefault();
-        downloadDocument(fileId);
+        if (loading) return;
+        await downloadDocument(fileId, setLoading);
     };
 
     return (
         <button
             onClick={handleClick}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 text-sm font-medium transition-colors"
-            title={`Download document ${fileId}`}
+            disabled={loading}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm font-medium transition-colors ${loading
+                ? "bg-white/10 text-white/50 border-white/20 cursor-wait"
+                : "bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"
+                }`}
+            title={loading ? "Loading..." : `Download document ${fileId}`}
         >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span>View Document</span>
+            {loading ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+            ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            )}
+            <span>{loading ? "Loading..." : "View Document"}</span>
         </button>
     );
 }

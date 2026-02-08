@@ -10,6 +10,7 @@ import {
     disconnectAuthWS,
     getOrCreateSessionId,
 } from "@/lib/auth-ws";
+import { getStoredAccessToken } from "@/lib/auth";
 
 type MessageAttachment = {
     type: "image" | "video";
@@ -36,15 +37,48 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://app.dev.thri
 const DOCUMENT_REF_REGEX = /\(document::([a-f0-9-]{36})\)/gi;
 
 /**
- * Download a file from Directus
+ * Download/view a file from Directus with authentication
  */
 async function downloadDocument(fileId: string): Promise<void> {
     try {
-        // Directus file download URL
-        const downloadUrl = `${BACKEND_URL}/assets/${fileId}?download`;
+        const token = getStoredAccessToken();
+        if (!token) {
+            alert("Please log in to view documents.");
+            return;
+        }
 
-        // Open in new tab for download
-        window.open(downloadUrl, "_blank");
+        // Fetch the file with auth header
+        const downloadUrl = `${BACKEND_URL}/assets/${fileId}`;
+        const response = await fetch(downloadUrl, {
+            headers: {
+                "Authorization": `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch document: ${response.status}`);
+        }
+
+        // Get content type and create blob
+        const contentType = response.headers.get("Content-Type") || "application/octet-stream";
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        // For PDFs and images, open in new tab; for others, trigger download
+        if (contentType.includes("pdf") || contentType.includes("image")) {
+            window.open(blobUrl, "_blank");
+        } else {
+            // Create a download link
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.download = `document-${fileId}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Clean up blob URL after a delay
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error("Failed to download document:", error);

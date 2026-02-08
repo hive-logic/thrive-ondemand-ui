@@ -96,39 +96,161 @@ async function downloadDocument(fileId: string, setLoading?: (loading: boolean) 
 }
 
 /**
- * Component to render a document download button
+ * Modal overlay to display a document
+ */
+function DocumentModal({
+    blobUrl,
+    contentType,
+    onClose
+}: {
+    blobUrl: string;
+    contentType: string;
+    onClose: () => void;
+}) {
+    const isImage = contentType.includes("image");
+    const isPdf = contentType.includes("pdf");
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={onClose}
+        >
+            <div
+                className="relative max-w-4xl w-full max-h-[90vh] bg-[#1b1b1c] rounded-2xl border border-white/10 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                    <span className="text-sm font-medium text-white/80">Document Viewer</span>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="overflow-auto max-h-[calc(90vh-56px)]">
+                    {isImage ? (
+                        <img
+                            src={blobUrl}
+                            alt="Document"
+                            className="w-full h-auto"
+                        />
+                    ) : isPdf ? (
+                        <iframe
+                            src={blobUrl}
+                            className="w-full h-[80vh]"
+                            title="PDF Document"
+                        />
+                    ) : (
+                        <div className="p-8 text-center">
+                            <p className="text-white/60 mb-4">This file type cannot be previewed.</p>
+                            <a
+                                href={blobUrl}
+                                download="document"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/80 text-white text-sm font-medium transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Download File
+                            </a>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Component to render a document download button with in-page viewer
  */
 function DocumentLink({ fileId }: { fileId: string }) {
     const [loading, setLoading] = useState(false);
+    const [viewerData, setViewerData] = useState<{ blobUrl: string; contentType: string } | null>(null);
 
     const handleClick = async (e: React.MouseEvent) => {
         e.preventDefault();
         if (loading) return;
-        await downloadDocument(fileId, setLoading);
+
+        setLoading(true);
+        try {
+            const token = getStoredAccessToken();
+            if (!token) {
+                alert("Please log in to view documents.");
+                return;
+            }
+
+            const downloadUrl = `${BACKEND_URL}/assets/${fileId}`;
+            const response = await fetch(downloadUrl, {
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch document: ${response.status}`);
+            }
+
+            const contentType = response.headers.get("Content-Type") || "application/octet-stream";
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+
+            // Show in modal
+            setViewerData({ blobUrl, contentType });
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error("Failed to load document:", error);
+            alert("Failed to load document. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleClose = () => {
+        if (viewerData) {
+            URL.revokeObjectURL(viewerData.blobUrl);
+        }
+        setViewerData(null);
     };
 
     return (
-        <button
-            onClick={handleClick}
-            disabled={loading}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm font-medium transition-colors ${loading
-                ? "bg-white/10 text-white/50 border-white/20 cursor-wait"
-                : "bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"
-                }`}
-            title={loading ? "Loading..." : `Download document ${fileId}`}
-        >
-            {loading ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-            ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+        <>
+            <button
+                onClick={handleClick}
+                disabled={loading}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm font-medium transition-colors ${loading
+                    ? "bg-white/10 text-white/50 border-white/20 cursor-wait"
+                    : "bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"
+                    }`}
+                title={loading ? "Loading..." : `View document`}
+            >
+                {loading ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                )}
+                <span>{loading ? "Loading..." : "View Document"}</span>
+            </button>
+
+            {viewerData && (
+                <DocumentModal
+                    blobUrl={viewerData.blobUrl}
+                    contentType={viewerData.contentType}
+                    onClose={handleClose}
+                />
             )}
-            <span>{loading ? "Loading..." : "View Document"}</span>
-        </button>
+        </>
     );
 }
 

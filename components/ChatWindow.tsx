@@ -4,6 +4,7 @@ import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { loadSession, UserSession } from "@/lib/session";
 import { useRouter } from "next/navigation";
 import { getWS, getActivityIdFromUrl, isWSOpen, subscribeWS, clearPublicUserData } from "@/lib/ws";
+import MarkdownMessage from "@/components/MarkdownMessage";
 
 type MessageAttachment = {
   type: "image" | "video";
@@ -53,7 +54,11 @@ const MessageBubble = memo(
               : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
             }`}
         >
-          <p className="whitespace-pre-wrap">{props.msg.content}</p>
+          {isUser ? (
+            <p className="whitespace-pre-wrap">{props.msg.content}</p>
+          ) : (
+            <MarkdownMessage content={props.msg.content} />
+          )}
           {props.msg.attachment && (
             <div className="mt-2 space-y-1">
               {props.msg.attachment.type === "image" && (
@@ -103,6 +108,7 @@ export default function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(true);
   const [pendingAttachment, setPendingAttachment] =
     useState<PendingAttachment | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -515,6 +521,32 @@ export default function ChatWindow() {
     });
   }
 
+  function sendQuickAction(text: string) {
+    if (!isWSOpen() || sending) return;
+    setShowQuickActions(false);
+
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: text,
+    };
+    setMessages((m) => [...m, userMsg]);
+
+    const ws = getWS();
+    const payload = {
+      activity_id: getActivityIdFromUrl(),
+      session_id: session?.session_id ?? null,
+      message: text,
+      time: new Date().toISOString(),
+      user_meta: userMeta,
+    };
+
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
+      setSending(true);
+    }
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const text = input.trim();
@@ -525,6 +557,7 @@ export default function ChatWindow() {
     }
 
     setInput("");
+    setShowQuickActions(false);
     const attachmentToSend = pendingAttachment;
     if (attachmentToSend) {
       setPendingAttachment(null);
@@ -954,6 +987,26 @@ export default function ChatWindow() {
             isLast={i === messages.length - 1}
           />
         ))}
+        {showQuickActions && messages.length <= 1 && !sending && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => sendQuickAction("I need to report an incident")}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm font-medium hover:bg-red-500/20 hover:border-red-500/50 transition-all active:scale-95"
+            >
+              <span>🚨</span>
+              <span>Report an Incident</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => sendQuickAction("Tell me about this event — schedule, venue, and key highlights")}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-blue-500/30 bg-blue-500/10 text-blue-300 text-sm font-medium hover:bg-blue-500/20 hover:border-blue-500/50 transition-all active:scale-95"
+            >
+              <span>ℹ️</span>
+              <span>Event Info</span>
+            </button>
+          </div>
+        )}
         {sending && <TypingIndicator />}
       </div>
 

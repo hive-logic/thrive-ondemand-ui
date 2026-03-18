@@ -114,8 +114,10 @@ function getAuthClientId(): string {
 }
 
 function getAuthWsUrl(): string {
-    // Connect to /ws/chat/{client_id} for authenticated Router agent
-    return `wss://${AGENT_HOST}/ws/chat/${getAuthClientId()}`;
+    const clientId = getAuthClientId();
+    const token = getStoredAccessToken();
+    const base = `wss://${AGENT_HOST}/ws/chat/${clientId}`;
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
 
 function connectAuth(): WebSocket {
@@ -179,10 +181,9 @@ function startPing(): void {
     pingIntervalId = setInterval(() => {
         if (authSocket && authSocket.readyState === WebSocket.OPEN) {
             try {
-                // Send a ping message - backend should ignore or echo this
-                authSocket.send(JSON.stringify({ type: "ping", timestamp: Date.now() }));
-                // eslint-disable-next-line no-console
-                console.log("WS ping sent");
+                // Send a minimal ping — just an empty JSON object
+                // The backend should see no "message" field and skip processing
+                authSocket.send("ping");
             } catch {
                 // ignore errors during ping
             }

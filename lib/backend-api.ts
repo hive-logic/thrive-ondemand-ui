@@ -119,11 +119,12 @@ export async function saveSubscription(activityId: string, userId: string, subsc
 export async function fetchQuickActionsData(customerId: string, accessToken: string): Promise<Record<string, any> | null> {
   console.log('[fetchQuickActionsData] Fetching for customer:', customerId);
   try {
-    const url = `${API_BASE_URL}/v1/quick_actions_data?customer_id=${encodeURIComponent(customerId)}&token=${encodeURIComponent(accessToken)}`;
+    const url = `${API_BASE_URL}/v1/quick_actions_data?customer_id=${encodeURIComponent(customerId)}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
       },
     });
 

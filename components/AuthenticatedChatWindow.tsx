@@ -511,12 +511,14 @@ export default function AuthenticatedChatWindow() {
         }
     }
 
-    function handleMainActionClick(type: string, payloadType: string, label: string) {
+    function handleMainActionClick(type: string, payloadType: string, displayMessage: string) {
         if (!quickActionsData[type] || quickActionsData[type].length === 0) {
             // Send the "all" action if there are no sub-items
             if (payloadType) {
                 const payload = JSON.stringify({ type: payloadType, id: "", name: "" });
-                sendQuickAction(`Executing action for all: ${label}`, payload);
+                sendQuickAction(displayMessage, payload);
+            } else {
+                sendQuickAction(displayMessage);
             }
             return;
         }
@@ -674,8 +676,8 @@ export default function AuthenticatedChatWindow() {
                     <div className="flex flex-wrap gap-2">
                         {/* Protocols */}
                         <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("sites", "protocol", "Protocols")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'sites' ? 'bg-primary/20 border-primary/50 text-white' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}>
+                            <button type="button" onClick={() => handleMainActionClick("sites", "protocols_all", "Show me the emergency response protocols")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'sites' ? 'bg-red-500/20 border-red-500/50 text-red-100' : 'border-red-500/20 bg-red-500/5 text-red-300 hover:bg-red-500/10'}`}>
                                 <span>🛡️</span> Protocols {quickActionsData.sites?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'sites' ? 'rotate-90' : ''}`}>▶</span>}
                             </button>
                             {expandedAction === 'sites' && (
@@ -708,7 +710,7 @@ export default function AuthenticatedChatWindow() {
 
                         {/* Visual Notifiers (Strobes) */}
                         <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("notifiers_visual", "notifier_visual_all", "Flash Strobe")}
+                            <button type="button" onClick={() => handleMainActionClick("notifiers_visual", "notifier_visual_all", "Flash all strobes")}
                                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'notifiers_visual' ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-100' : 'border-yellow-500/20 bg-yellow-500/5 text-yellow-300 hover:bg-yellow-500/10'}`}>
                                 <span>⚡</span> Flash Strobe {quickActionsData.notifiers_visual?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'notifiers_visual' ? 'rotate-90' : ''}`}>▶</span>}
                             </button>
@@ -732,7 +734,7 @@ export default function AuthenticatedChatWindow() {
 
                         {/* audio */}
                         <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("notifiers_audio", "notifier_audio_all", "Audio Alert")}
+                            <button type="button" onClick={() => handleMainActionClick("notifiers_audio", "notifier_audio_all", "Send audio alert to all speakers")}
                                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'notifiers_audio' ? 'bg-orange-500/20 border-orange-500/50 text-orange-100' : 'border-orange-500/20 bg-orange-500/5 text-orange-300 hover:bg-orange-500/10'}`}>
                                 <span>🔊</span> Audio Alert {quickActionsData.notifiers_audio?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'notifiers_audio' ? 'rotate-90' : ''}`}>▶</span>}
                             </button>
@@ -752,7 +754,7 @@ export default function AuthenticatedChatWindow() {
 
                         {/* doors */}
                         <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("doors", "door_lock_all", "Lock Doors")}
+                            <button type="button" onClick={() => handleMainActionClick("doors", "door_lock_all", "Lock all doors")}
                                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'doors_lock' ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-100' : 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500/10'}`}>
                                 <span>🔒</span> Lock Doors {quickActionsData.doors?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'doors_lock' ? 'rotate-90' : ''}`}>▶</span>}
                             </button>
@@ -771,7 +773,7 @@ export default function AuthenticatedChatWindow() {
                         </div>
 
                         <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("doors", "door_unlock_all", "Unlock Doors")}
+                            <button type="button" onClick={() => handleMainActionClick("doors", "door_unlock_all", "Unlock all doors")}
                                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'doors_unlock' ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-100' : 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/10'}`}>
                                 <span>🔓</span> Unlock Doors {quickActionsData.doors?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'doors_unlock' ? 'rotate-90' : ''}`}>▶</span>}
                             </button>
@@ -788,6 +790,12 @@ export default function AuthenticatedChatWindow() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Email Alert */}
+                        <button type="button" onClick={() => handleMainActionClick("email", "", "Send an email alert")}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white/80 text-[12px] font-medium hover:bg-white/10 transition-all active:scale-95">
+                            <span>✉️</span> Email Alert
+                        </button>
                     </div>
 
                     {/* --- QUICK INFO GROUP --- */}
@@ -795,7 +803,7 @@ export default function AuthenticatedChatWindow() {
                     <div className="flex flex-wrap gap-2 pb-2">
                         {/* cameras */}
                         <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("cameras", "camera_status_all", "Camera Status")}
+                            <button type="button" onClick={() => handleMainActionClick("cameras", "camera_all", "Show me all cameras and their statuses")}
                                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'cameras' ? 'bg-blue-500/20 border-blue-500/50 text-blue-100' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}>
                                 <span>📹</span> Camera Status {quickActionsData.cameras?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'cameras' ? 'rotate-90' : ''}`}>▶</span>}
                             </button>
@@ -816,7 +824,7 @@ export default function AuthenticatedChatWindow() {
 
                         {/* doors info */}
                         <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("doors", "door_status_all", "Door Status")}
+                            <button type="button" onClick={() => handleMainActionClick("doors", "door_all", "Show me all doors and their statuses")}
                                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'doors_status' ? 'bg-blue-500/20 border-blue-500/50 text-blue-100' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}>
                                 <span>🚪</span> Door Status {quickActionsData.doors?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'doors_status' ? 'rotate-90' : ''}`}>▶</span>}
                             </button>
@@ -837,7 +845,7 @@ export default function AuthenticatedChatWindow() {
 
                         {/* SOPs */}
                         <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("sops", "sop_all", "SOPs")}
+                            <button type="button" onClick={() => handleMainActionClick("sops", "sop_all", "Show me all available SOPs")}
                                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'sops' ? 'bg-blue-500/20 border-blue-500/50 text-blue-100' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}>
                                 <span>📖</span> SOPs {quickActionsData.sops?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'sops' ? 'rotate-90' : ''}`}>▶</span>}
                             </button>
@@ -855,12 +863,29 @@ export default function AuthenticatedChatWindow() {
                             )}
                         </div>
 
-                        {/* Direct action single clicks */}
-                        <button type="button" onClick={() => sendQuickAction("Help me create an incident report")}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-500/20 bg-red-500/5 text-red-300 text-[12px] font-medium hover:bg-red-500/10 transition-all active:scale-95">
-                            <span>📋</span> Incident Report
-                        </button>
-                        <button type="button" onClick={() => sendQuickAction("Show me the recent alerts")}
+                        {/* Incident Reports */}
+                        <div className="relative">
+                            <button type="button" onClick={() => handleMainActionClick("incident_reports", "incident_report_all", "Show me all incident reports")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'incident_reports' ? 'bg-red-500/20 border-red-500/50 text-red-100' : 'border-red-500/20 bg-red-500/5 text-red-300 hover:bg-red-500/10'}`}>
+                                <span>📋</span> Incident Report {quickActionsData.incident_reports?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'incident_reports' ? 'rotate-90' : ''}`}>▶</span>}
+                            </button>
+                            {expandedAction === 'incident_reports' && (
+                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    <div className="max-h-64 overflow-y-auto themed-scroll">
+                                    {quickActionsData.incident_reports?.map((item: any) => (
+                                        <button key={item.id} onClick={() => handleSubItemClick("incident_report", item, "Show incident report")}
+                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 flex flex-col transition-colors">
+                                            <span className="truncate w-full font-medium">Report {item.id.slice(0, 8)}</span>
+                                            {item.date_created && <span className="text-[10px] text-white/40">{new Date(item.date_created).toLocaleDateString()}</span>}
+                                        </button>
+                                    ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Recent Alerts */}
+                        <button type="button" onClick={() => sendQuickAction("Show me the recent alerts", JSON.stringify({ type: "recent_alerts_all", id: "", name: "" }))}
                             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white/80 text-[12px] font-medium hover:bg-white/10 transition-all active:scale-95">
                             <span>🔔</span> Recent Alerts
                         </button>

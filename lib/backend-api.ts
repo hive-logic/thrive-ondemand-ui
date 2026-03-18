@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://agent.thrivelogic.ai';
+const API_BASE_URL = 'https://varca.thrivelogic.ai';
 
 export async function checkUserId(activityId: string, email: string): Promise<string | null> {
   try {

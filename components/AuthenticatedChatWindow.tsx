@@ -40,56 +40,30 @@ const DOCUMENT_REF_REGEX = /\(document::([a-f0-9-]{36})\)/gi;
 
 /**
  * Download/view a file from Directus with authentication
- * Opens window immediately to avoid popup blocker, then loads content
  */
 async function downloadDocument(fileId: string, setLoading?: (loading: boolean) => void): Promise<void> {
     setLoading?.(true);
-
     try {
         const token = getStoredAccessToken();
-        if (!token) {
-            alert("Please log in to view documents.");
-            setLoading?.(false);
-            return;
-        }
-
-        // Fetch the file with auth header
+        if (!token) { alert("Please log in to view documents."); setLoading?.(false); return; }
         const downloadUrl = `${BACKEND_URL}/assets/${fileId}`;
-        const response = await fetch(downloadUrl, {
-            headers: {
-                "Authorization": `Bearer ${token}`,
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch document: ${response.status}`);
-        }
-
-        // Get content type and create blob
+        const response = await fetch(downloadUrl, { headers: { "Authorization": `Bearer ${token}` } });
+        if (!response.ok) throw new Error(`Failed to fetch document: ${response.status}`);
         const contentType = response.headers.get("Content-Type") || "application/octet-stream";
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
-
-        // Use anchor element with download attribute - works better on mobile
         const link = document.createElement("a");
         link.href = blobUrl;
-
-        // For PDFs and images, try to open inline; for others, force download
         if (contentType.includes("pdf") || contentType.includes("image")) {
-            link.target = "_blank";
-            link.rel = "noopener noreferrer";
+            link.target = "_blank"; link.rel = "noopener noreferrer";
         } else {
             link.download = `document-${fileId}`;
         }
-
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-
-        // Clean up blob URL after a delay
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     } catch (error) {
-        // eslint-disable-next-line no-console
         console.error("Failed to download document:", error);
         alert("Failed to download document. Please try again.");
     } finally {
@@ -97,80 +71,40 @@ async function downloadDocument(fileId: string, setLoading?: (loading: boolean) 
     }
 }
 
-/**
- * Component to render a document download button - downloads directly to device
- */
 function DocumentLink({ fileId }: { fileId: string }) {
     const [loading, setLoading] = useState(false);
-
     const handleClick = async (e: React.MouseEvent) => {
         e.preventDefault();
         if (loading) return;
-
         setLoading(true);
         try {
             const token = getStoredAccessToken();
-            if (!token) {
-                alert("Please log in to download documents.");
-                return;
-            }
-
+            if (!token) { alert("Please log in to download documents."); return; }
             const downloadUrl = `${BACKEND_URL}/assets/${fileId}`;
-            const response = await fetch(downloadUrl, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to fetch document: ${response.status}`);
-            }
-
+            const response = await fetch(downloadUrl, { headers: { "Authorization": `Bearer ${token}` } });
+            if (!response.ok) throw new Error(`Failed to fetch document: ${response.status}`);
             const contentType = response.headers.get("Content-Type") || "application/octet-stream";
             const blob = await response.blob();
             const blobUrl = URL.createObjectURL(blob);
-
-            // Determine file extension from content type
             const extMap: Record<string, string> = {
-                "application/pdf": ".pdf",
-                "image/jpeg": ".jpg",
-                "image/png": ".png",
-                "image/gif": ".gif",
-                "image/webp": ".webp",
-                "video/mp4": ".mp4",
-                "text/plain": ".txt",
+                "application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png",
+                "image/gif": ".gif", "image/webp": ".webp", "video/mp4": ".mp4", "text/plain": ".txt",
             };
             const ext = extMap[contentType] || "";
             const fileName = `document-${fileId.slice(0, 8)}${ext}`;
-
-            // Create download link and trigger download
             const link = document.createElement("a");
-            link.href = blobUrl;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            // Clean up blob URL after a short delay
+            link.href = blobUrl; link.download = fileName;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
             setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
         } catch (error) {
-            // eslint-disable-next-line no-console
             console.error("Failed to download document:", error);
             alert("Failed to download document. Please try again.");
-        } finally {
-            setLoading(false);
-        }
+        } finally { setLoading(false); }
     };
-
     return (
-        <button
-            onClick={handleClick}
-            disabled={loading}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm font-medium transition-colors ${
-                loading ? "bg-white/10 text-white/50 border-white/20 cursor-wait" : "bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"
-            }`}
-            title={loading ? "Downloading..." : "Download document"}
-        >
+        <button onClick={handleClick} disabled={loading}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm font-medium transition-colors ${loading ? "bg-white/10 text-white/50 border-white/20 cursor-wait" : "bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"}`}
+            title={loading ? "Downloading..." : "Download document"}>
             {loading ? (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -186,57 +120,35 @@ function DocumentLink({ fileId }: { fileId: string }) {
     );
 }
 
-/**
- * Process message content and replace document references with React elements
- */
 function processDocumentReferences(content: string): React.ReactNode {
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
-
-    // Reset regex lastIndex
     DOCUMENT_REF_REGEX.lastIndex = 0;
-
     while ((match = DOCUMENT_REF_REGEX.exec(content)) !== null) {
-        // Add text before the match
-        if (match.index > lastIndex) {
-            parts.push(content.slice(lastIndex, match.index));
-        }
-
-        // Add the document link component
+        if (match.index > lastIndex) parts.push(content.slice(lastIndex, match.index));
         const fileId = match[1];
         parts.push(<DocumentLink key={`doc-${fileId}-${match.index}`} fileId={fileId} />);
-
         lastIndex = match.index + match[0].length;
     }
-
-    // Add remaining text after last match
-    if (lastIndex < content.length) {
-        parts.push(content.slice(lastIndex));
-    }
-
-    // If no matches, return original content
-    if (parts.length === 0) {
-        return content;
-    }
-
+    if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+    if (parts.length === 0) return content;
     return <>{parts}</>;
 }
+
+// Suppress unused warning — used by MarkdownMessage indirectly
+void processDocumentReferences;
 
 const MessageBubble = memo(
     function MessageBubble(props: MessageBubbleProps) {
         const isUser = props.msg.role === "user";
         return (
-            <div
-                className={`flex ${isUser ? "justify-end" : "justify-start"} ${props.isLast ? "message-in" : ""}`}
-            >
-                <div
-                    className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${
-                        isUser
-                            ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
-                            : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
-                    }`}
-                >
+            <div className={`flex ${isUser ? "justify-end" : "justify-start"} ${props.isLast ? "message-in" : ""}`}>
+                <div className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${
+                    isUser
+                        ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
+                        : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
+                }`}>
                     <div>
                         {isUser ? (
                             <p className="whitespace-pre-wrap">{props.msg.content}</p>
@@ -247,23 +159,12 @@ const MessageBubble = memo(
                     {props.msg.attachment && (
                         <div className="mt-2 space-y-1">
                             {props.msg.attachment.type === "image" && (
-                                <img
-                                    src={props.msg.attachment.url}
-                                    alt={props.msg.attachment.fileName || "Attached image"}
-                                    className="max-w-full rounded-xl border border-white/10"
-                                />
+                                <img src={props.msg.attachment.url} alt={props.msg.attachment.fileName || "Attached image"} className="max-w-full rounded-xl border border-white/10" />
                             )}
                             {props.msg.attachment.type === "video" && (
-                                <video
-                                    controls
-                                    playsInline
-                                    src={props.msg.attachment.url}
-                                    className="max-w-full rounded-xl border border-white/10"
-                                />
+                                <video controls playsInline src={props.msg.attachment.url} className="max-w-full rounded-xl border border-white/10" />
                             )}
-                            <p className="text-[11px] text-white/60 truncate">
-                                {props.msg.attachment.fileName}
-                            </p>
+                            <p className="text-[11px] text-white/60 truncate">{props.msg.attachment.fileName}</p>
                         </div>
                     )}
                 </div>
@@ -287,6 +188,18 @@ const TypingIndicator = memo(function TypingIndicator() {
     );
 });
 
+// ─── Bottom sheet config type ───────────────────────────────────────────────
+type SheetConfig = {
+    title: string;
+    icon: string;
+    sheetType: "standard" | "strobe" | "protocol" | "incident" | "direct";
+    items: any[];
+    allPayloadType?: string;
+    allMessage?: string;
+    itemPayloadType?: string;
+    itemLabelPrefix?: string;
+};
+
 export default function AuthenticatedChatWindow() {
     const { user } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
@@ -295,9 +208,10 @@ export default function AuthenticatedChatWindow() {
     const [connected, setConnected] = useState(false);
     const [actionsOpen, setActionsOpen] = useState(false);
     const [quickActionsData, setQuickActionsData] = useState<Record<string, any>>({});
-    const [expandedAction, setExpandedAction] = useState<string | null>(null);
-    const [expandedSite, setExpandedSite] = useState<string | null>(null);
     const [loadingActions, setLoadingActions] = useState(false);
+    const [activeSheet, setActiveSheet] = useState<SheetConfig | null>(null);
+    const [expandedSite, setExpandedSite] = useState<string | null>(null);
+
     const scrollRef = useRef<HTMLDivElement>(null);
     const streamMsgIdRef = useRef<string | null>(null);
     const tokenQueueRef = useRef<string[]>([]);
@@ -307,28 +221,23 @@ export default function AuthenticatedChatWindow() {
     // Fetch quick actions data
     useEffect(() => {
         if (!user?.customer?.id) return;
-        
         async function loadActions() {
             setLoadingActions(true);
             try {
                 const token = getStoredAccessToken();
                 if (!token) return;
-                
                 const data = await fetchQuickActionsData(user!.customer!.id, token);
-                if (data) {
-                    setQuickActionsData(data);
-                }
+                if (data) setQuickActionsData(data);
             } catch (err) {
                 console.error("Failed to load quick actions data:", err);
             } finally {
                 setLoadingActions(false);
             }
         }
-        
         loadActions();
     }, [user]);
 
-    // Protocol action definitions (matching Directus)
+    // Protocol action definitions
     const protocolActions = [
         { key: "fire", icon: "🔥", label: "Fire", color: "red", severity: 10 },
         { key: "active_shooter", icon: "🔫", label: "Active Shooter", color: "red", severity: 10 },
@@ -341,25 +250,15 @@ export default function AuthenticatedChatWindow() {
     useEffect(() => {
         if (!user) return;
         const firstName = user.first_name || user.email.split("@")[0];
-        const welcome = `Hello ${firstName}! I'm your AI assistant. How can I help you today?`;
-        setMessages([
-            {
-                id: "m1",
-                role: "assistant",
-                content: welcome,
-            },
-        ]);
+        setMessages([{ id: "m1", role: "assistant", content: `Hello ${firstName}! I'm your AI assistant. How can I help you today?` }]);
     }, [user]);
 
     // Scroll to bottom on new messages
     useEffect(() => {
-        scrollRef.current?.scrollTo({
-            top: scrollRef.current.scrollHeight,
-            behavior: "smooth",
-        });
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [messages]);
 
-    // WebSocket connection and message handling
+    // WebSocket connection
     useEffect(() => {
         const ws = getAuthWS();
         setConnected(ws.readyState === WebSocket.OPEN);
@@ -368,97 +267,52 @@ export default function AuthenticatedChatWindow() {
             onMessage: (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    // eslint-disable-next-line no-console
-                    console.log("Auth WS message:", data);
-
+                    // console.log("Auth WS message:", data);
                     if (data.type !== "message") return;
-
-                    // Session ID is now generated on frontend - no need to capture from backend
-
-                    // Ensure streaming target exists
                     if (!streamMsgIdRef.current) {
                         const newId = crypto.randomUUID();
                         streamMsgIdRef.current = newId;
-                        setMessages((prev) => [
-                            ...prev,
-                            { id: newId, role: "assistant", content: "" },
-                        ]);
+                        setMessages((prev) => [...prev, { id: newId, role: "assistant", content: "" }]);
                     }
-
-                    // Queue token for smooth rendering
                     if (typeof data.content === "string") {
                         tokenQueueRef.current.push(data.content);
                         scheduleFlush();
                     }
-
                     if (data.isComplete) {
                         flushCompletePendingRef.current = true;
                         scheduleFlush();
                     }
                 } catch {
-                    // Plain string response — filter out errors and system messages
                     const raw = String(event.data);
-                    if (
-                        raw.startsWith("Invalid") ||
-                        raw.startsWith("Error") ||
-                        raw.includes("pong") ||
-                        raw.includes("ping")
-                    ) {
-                        // eslint-disable-next-line no-console
-                        console.log("Auth WS system/error (ignored):", raw);
+                    if (raw.startsWith("Invalid") || raw.startsWith("Error") || raw.includes("pong") || raw.includes("ping")) {
+                        // console.log("Auth WS system/error (ignored):", raw);
                         return;
                     }
-                    setMessages((prev) => [
-                        ...prev,
-                        {
-                            id: crypto.randomUUID(),
-                            role: "assistant",
-                            content: raw,
-                        },
-                    ]);
+                    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: raw }]);
                 }
             },
             onOpen: () => setConnected(true),
-            onClose: () => {
-                setConnected(false);
-                // Don't immediately clear sending state - let reconnection restore it
-                // Only clear if there's no active streaming (streamMsgIdRef will be set during active response)
-                // The ping mechanism will keep connection alive, this is fallback behavior
-                if (!streamMsgIdRef.current) {
-                    setSending(false);
-                }
-            },
+            onClose: () => { setConnected(false); if (!streamMsgIdRef.current) setSending(false); },
             onError: () => setConnected(false),
         });
 
         return () => {
             unsubscribe();
-            if (flushTimerRef.current !== null) {
-                window.clearTimeout(flushTimerRef.current);
-                flushTimerRef.current = null;
-            }
+            if (flushTimerRef.current !== null) { window.clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
         };
     }, []);
 
     function scheduleFlush() {
         if (flushTimerRef.current !== null) return;
-
         const tick = () => {
             const msgId = streamMsgIdRef.current;
             if (msgId && tokenQueueRef.current.length > 0) {
                 const token = tokenQueueRef.current.shift()!;
-                setMessages((prev) =>
-                    prev.map((m) =>
-                        m.id === msgId ? { ...m, content: m.content + token } : m
-                    )
-                );
-                requestAnimationFrame(() => {
-                    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-                });
+                setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, content: m.content + token } : m));
+                requestAnimationFrame(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); });
                 flushTimerRef.current = window.setTimeout(tick, 20);
                 return;
             }
-
             if (flushCompletePendingRef.current) {
                 flushCompletePendingRef.current = false;
                 streamMsgIdRef.current = null;
@@ -466,201 +320,108 @@ export default function AuthenticatedChatWindow() {
             }
             flushTimerRef.current = null;
         };
-
         flushTimerRef.current = window.setTimeout(tick, 10);
     }
 
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            disconnectAuthWS();
-        };
-    }, []);
+    useEffect(() => { return () => { disconnectAuthWS(); }; }, []);
 
+    // ─── Actions ────────────────────────────────────────────────────────────
     function sendQuickAction(text: string, payloadStr?: string) {
         if (!isAuthWSOpen() || sending) return;
         setActionsOpen(false);
-        setExpandedAction(null);
+        setActiveSheet(null);
         setExpandedSite(null);
-
-        // Always show the text to the user
-        const userMsg: Message = {
-            id: crypto.randomUUID(),
-            role: "user",
-            content: text,
-        };
+        const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text };
         setMessages((m) => [...m, userMsg]);
-
         const ws = getAuthWS();
         const userMeta = getAuthUserMeta();
-        
-        // If a deterministic payload is provided, send that to the bot instead of the text
         const messageToSend = payloadStr ? `###quick_actions###${payloadStr}###` : text;
-        
-        const payload = {
-            user_uuid: userMeta?.id,
-            message: messageToSend,
-            time: new Date().toISOString(),
-            user_meta: userMeta,
-            session_id: getOrCreateSessionId(),
-        };
-
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify(payload));
-            setSending(true);
-        }
+        const payload = { user_uuid: userMeta?.id, message: messageToSend, time: new Date().toISOString(), user_meta: userMeta, session_id: getOrCreateSessionId() };
+        if (ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(payload)); setSending(true); }
     }
 
-    function handleMainActionClick(type: string, payloadType: string, displayMessage: string) {
-        if (!quickActionsData[type] || quickActionsData[type].length === 0) {
-            // Send the "all" action if there are no sub-items
-            if (payloadType) {
-                const payload = JSON.stringify({ type: payloadType, id: "", name: "" });
-                sendQuickAction(displayMessage, payload);
-            } else {
-                sendQuickAction(displayMessage);
-            }
-            return;
-        }
+    function openSheet(cfg: SheetConfig) {
+        setExpandedSite(null);
+        setActiveSheet(prev => (prev?.title === cfg.title ? null : cfg));
+    }
 
-        // Toggle sub-menu
-        if (expandedAction === type) {
-            setExpandedAction(null);
-            setExpandedSite(null);
+    function closeSubmenu() { setActiveSheet(null); setExpandedSite(null); }
+
+    function sendAll(displayMessage: string, payloadType?: string) {
+        closeSubmenu();
+        if (payloadType) {
+            sendQuickAction(displayMessage, JSON.stringify({ type: payloadType, id: "", name: "" }));
         } else {
-            setExpandedAction(type);
-            setExpandedSite(null);
+            sendQuickAction(displayMessage);
         }
     }
 
     function handleProtocolSubmit(site: any, proto: any) {
-        const payload = JSON.stringify({
-            type: "protocol_execute",
-            site_id: site.id,
-            site_name: site.name,
-            protocol: proto.key,
-            protocol_label: proto.label,
-            color: proto.color,
-            severity: proto.severity,
-        });
+        const payload = JSON.stringify({ type: "protocol_execute", site_id: site.id, site_name: site.name, protocol: proto.key, protocol_label: proto.label, color: proto.color, severity: proto.severity });
         sendQuickAction(`Initiating ${proto.label} protocol at ${site.name}`, payload);
     }
 
     function handleSubItemClick(actionType: string, item: any, labelPrefix: string) {
-        const payload = JSON.stringify({
-            type: actionType,
-            id: item.id,
-            name: item.name || item.title || item.date || "",
-        });
+        const payload = JSON.stringify({ type: actionType, id: item.id, name: item.name || item.title || item.date || "" });
         const itemName = item.name || item.title || item.date || "Selected item";
         sendQuickAction(`${labelPrefix}: ${itemName}`, payload);
     }
 
     function handleStrobeFlash(item: any, color: string) {
-        const payload = JSON.stringify({
-            type: "notifier_visual_color",
-            id: item.id,
-            name: item.name || "",
-            color: color,
-        });
+        const payload = JSON.stringify({ type: "notifier_visual_color", id: item.id, name: item.name || "", color });
         sendQuickAction(`Flashing ${color} strobe at ${item.name}`, payload);
     }
 
     async function handleSend(e: React.FormEvent) {
         e.preventDefault();
         const text = input.trim();
-        if (!text) return;
-        if (!isAuthWSOpen()) return;
-
+        if (!text || !isAuthWSOpen()) return;
         setInput("");
-
-        const userMsg: Message = {
-            id: crypto.randomUUID(),
-            role: "user",
-            content: text,
-        };
+        const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text };
         setMessages((m) => [...m, userMsg]);
-
         const ws = getAuthWS();
         const userMeta = getAuthUserMeta();
-
-        const payload = {
-            user_uuid: userMeta?.id,
-            message: text,
-            time: new Date().toISOString(),
-            user_meta: userMeta,
-            session_id: getOrCreateSessionId(),
-        };
-
-        // eslint-disable-next-line no-console
-        console.log("Auth WS sending:", payload);
-
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify(payload));
-            setSending(true);
-        }
+        const payload = { user_uuid: userMeta?.id, message: text, time: new Date().toISOString(), user_meta: userMeta, session_id: getOrCreateSessionId() };
+        // console.log("Auth WS sending:", payload);
+        if (ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(payload)); setSending(true); }
     }
 
+    // ─── Render ─────────────────────────────────────────────────────────────
     return (
         <div className="relative flex flex-col h-full pb-safe">
             {/* Ambient background */}
-            <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
-            >
+            <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
                 <div className="absolute -top-24 -left-24 h-80 w-80 rounded-full bg-primary/30 blur-3xl animate-pulse-slow" />
-                <div
-                    className="absolute top-1/3 -right-24 h-96 w-96 rounded-full bg-accent/25 blur-3xl animate-pulse-slow"
-                    style={{ animationDelay: "400ms" }}
-                />
-                <div
-                    className="absolute bottom-[-4rem] left-1/2 -translate-x-1/2 h-72 w-72 rounded-full bg-indigo/20 blur-3xl animate-pulse-slow"
-                    style={{ animationDelay: "800ms" }}
-                />
+                <div className="absolute top-1/3 -right-24 h-96 w-96 rounded-full bg-accent/25 blur-3xl animate-pulse-slow" style={{ animationDelay: "400ms" }} />
+                <div className="absolute bottom-[-4rem] left-1/2 -translate-x-1/2 h-72 w-72 rounded-full bg-indigo/20 blur-3xl animate-pulse-slow" style={{ animationDelay: "800ms" }} />
                 <div className="absolute inset-0 bg-grid opacity-[0.18]" />
             </div>
 
             {/* Header */}
             <div className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-white/10">
                 <div className="flex items-center gap-2">
-                    <span
-                        className={`h-2.5 w-2.5 rounded-full ${connected ? "bg-emerald-400" : "bg-red-400"
-                            }`}
-                        aria-label={connected ? "Connected" : "Disconnected"}
-                    />
+                    <span className={`h-2.5 w-2.5 rounded-full ${connected ? "bg-emerald-400" : "bg-red-400"}`} aria-label={connected ? "Connected" : "Disconnected"} />
                     <div className="text-sm font-semibold">VARCA Assistant</div>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setActionsOpen((o) => !o)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                            actionsOpen
-                                ? "bg-white/15 border-white/20 text-white"
-                                : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
-                        }`}
-                    >
+                    <button type="button" onClick={() => { setActionsOpen((o) => !o); if (actionsOpen) closeSubmenu(); }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${actionsOpen ? "bg-white/15 border-white/20 text-white" : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"}`}>
                         <span>⚡</span>
                         <span>Actions</span>
-                        <svg
-                            className={`w-3 h-3 transition-transform ${actionsOpen ? "rotate-180" : ""}`}
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        >
+                        <svg className={`w-3 h-3 transition-transform ${actionsOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div className="text-xs text-white/40">
-                        {!connected ? "Reconnecting…" : ""}
-                    </div>
+                    <div className="text-xs text-white/40">{!connected ? "Reconnecting…" : ""}</div>
                 </div>
             </div>
 
-            {/* Quick Actions Panel */}
+            {/* Quick Actions Panel — button grid */}
             {actionsOpen && (
-                <div className="px-4 md:px-6 py-5 border-b border-white/[0.08] bg-[#1a1b1e]/60 backdrop-blur-2xl shadow-[inset_0_-1px_0_0_rgba(255,255,255,0.02)] space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 relative z-10">
-                    
+                <div className="px-4 md:px-6 py-5 border-b border-white/[0.08] bg-[#1a1b1e]/60 backdrop-blur-2xl space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 relative z-10">
+
                     {loadingActions && (
-                        <div className="absolute inset-0 flex border-b items-center justify-center bg-[#1a1b1e]/60 backdrop-blur-md z-20">
+                        <div className="absolute inset-0 flex items-center justify-center bg-[#1a1b1e]/70 backdrop-blur-md z-20 rounded-b-xl">
                             <div className="flex items-center gap-2 text-white/70 text-sm font-medium bg-black/20 px-4 py-2 rounded-full border border-white/5 shadow-2xl">
                                 <svg className="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -670,263 +431,256 @@ export default function AuthenticatedChatWindow() {
                             </div>
                         </div>
                     )}
-                    
-                    {/* --- ACTIONS GROUP --- */}
-                    <div className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-bold mb-2 ml-1">Actions</div>
+
+                    {/* Actions group */}
+                    <div className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-bold ml-1">Actions</div>
                     <div className="flex flex-wrap gap-2">
-                        {/* Protocols */}
-                        <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("sites", "protocols_all", "Show me the emergency response protocols")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${expandedAction === 'sites' ? 'bg-gradient-to-r from-red-500/20 to-rose-500/10 border-red-500/40 text-red-100 shadow-[0_0_15px_-3px_rgba(239,68,68,0.2)]' : 'border-red-500/20 bg-red-500/5 text-red-300 hover:bg-red-500/15 hover:border-red-500/30 hover:shadow-[0_0_10px_-3px_rgba(239,68,68,0.1)]'}`}>
-                                <span className={`transition-transform duration-300 ${expandedAction === 'sites' ? 'scale-110' : ''}`}>🛡️</span> Protocols {quickActionsData.sites?.length > 0 && <span className={`text-[10px] opacity-40 transition-transform duration-300 ${expandedAction === 'sites' ? 'rotate-90' : ''}`}>▶</span>}
-                            </button>
-                            {expandedAction === 'sites' && (
-                                <div className="absolute top-full left-0 mt-2 w-64 bg-[#1a1b1e]/80 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
-                                    {quickActionsData.sites?.map((site: any) => (
-                                        <div key={site.id} className="border-b border-white/5 last:border-0 relative">
-                                            <button type="button" onClick={() => setExpandedSite(expandedSite === site.id ? null : site.id)}
-                                                className={`w-full text-left px-3 py-2.5 text-[12px] font-medium transition-colors flex items-center justify-between ${expandedSite === site.id ? "bg-white/10 text-white" : "text-white/80 hover:bg-white/5"}`}>
-                                                <span>{site.name}</span>
-                                                <span className={`transition-transform opacity-50 text-[10px] ${expandedSite === site.id ? "rotate-90" : ""}`}>▶</span>
-                                            </button>
-                                            
-                                            {/* Protocol Grid Dropdown */}
-                                            {expandedSite === site.id && (
-                                                <div className="bg-black/40 p-2 grid grid-cols-1 gap-1 border-t border-white/5 shadow-inner">
-                                                    {protocolActions.map((proto) => (
-                                                        <button key={proto.key} onClick={() => handleProtocolSubmit(site, proto)}
-                                                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/90 text-[12px] font-medium text-left">
-                                                            <span className="text-base">{proto.icon}</span>
-                                                            <span>{proto.label}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Visual Notifiers (Strobes) */}
-                        <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("notifiers_visual", "notifier_visual_all", "Flash all strobes")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${expandedAction === 'notifiers_visual' ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border-yellow-500/40 text-yellow-100 shadow-[0_0_15px_-3px_rgba(234,179,8,0.2)]' : 'border-yellow-500/20 bg-yellow-500/5 text-yellow-300 hover:bg-yellow-500/15 hover:border-yellow-500/30 hover:shadow-[0_0_10px_-3px_rgba(234,179,8,0.1)]'}`}>
-                                <span className={`transition-transform duration-300 ${expandedAction === 'notifiers_visual' ? 'scale-110' : ''}`}>⚡</span> Flash Strobe {quickActionsData.notifiers_visual?.length > 0 && <span className={`text-[10px] opacity-40 transition-transform duration-300 ${expandedAction === 'notifiers_visual' ? 'rotate-90' : ''}`}>▶</span>}
-                            </button>
-                            {expandedAction === 'notifiers_visual' && (
-                                <div className="absolute top-full left-0 mt-2 w-64 bg-[#1a1b1e]/80 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
-                                    <div className="max-h-64 overflow-y-auto themed-scroll">
-                                    {quickActionsData.notifiers_visual?.map((item: any) => (
-                                        <div key={item.id} className="flex flex-col px-3 py-2.5 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                                            <span className="text-[12px] text-white/90 mb-2 truncate">{item.name}</span>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <button onClick={() => handleStrobeFlash(item, 'green')} className="flex-1 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/50 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold tracking-widest text-center transition-colors">GREEN</button>
-                                                <button onClick={() => handleStrobeFlash(item, 'yellow')} className="flex-1 py-1.5 rounded bg-yellow-500/20 hover:bg-yellow-500/50 border border-yellow-500/30 text-yellow-400 text-[10px] font-bold tracking-widest text-center transition-colors">YELLOW</button>
-                                                <button onClick={() => handleStrobeFlash(item, 'red')} className="flex-1 py-1.5 rounded bg-red-500/20 hover:bg-red-500/50 border border-red-500/30 text-red-500 text-[10px] font-bold tracking-widest text-center transition-colors">RED</button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* audio */}
-                        <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("notifiers_audio", "notifier_audio_all", "Send audio alert to all speakers")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${expandedAction === 'notifiers_audio' ? 'bg-gradient-to-r from-orange-500/20 to-amber-500/10 border-orange-500/40 text-orange-100 shadow-[0_0_15px_-3px_rgba(249,115,22,0.2)]' : 'border-orange-500/20 bg-orange-500/5 text-orange-300 hover:bg-orange-500/15 hover:border-orange-500/30 hover:shadow-[0_0_10px_-3px_rgba(249,115,22,0.1)]'}`}>
-                                <span className={`transition-transform duration-300 ${expandedAction === 'notifiers_audio' ? 'scale-110' : ''}`}>🔊</span> Audio Alert {quickActionsData.notifiers_audio?.length > 0 && <span className={`text-[10px] opacity-40 transition-transform duration-300 ${expandedAction === 'notifiers_audio' ? 'rotate-90' : ''}`}>▶</span>}
-                            </button>
-                            {expandedAction === 'notifiers_audio' && (
-                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e]/80 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
-                                    <div className="max-h-64 overflow-y-auto themed-scroll">
-                                    {quickActionsData.notifiers_audio?.map((item: any) => (
-                                        <button key={item.id} onClick={() => handleSubItemClick("notifier_audio", item, "Play alert at")}
-                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 truncate transition-colors">
-                                            {item.name}
-                                        </button>
-                                    ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* doors */}
-                        <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("doors", "door_lock_all", "Lock all doors")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${expandedAction === 'doors_lock' ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/10 border-indigo-500/40 text-indigo-100 shadow-[0_0_15px_-3px_rgba(99,102,241,0.2)]' : 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500/15 hover:border-indigo-500/30 hover:shadow-[0_0_10px_-3px_rgba(99,102,241,0.1)]'}`}>
-                                <span className={`transition-transform duration-300 ${expandedAction === 'doors_lock' ? 'scale-110' : ''}`}>🔒</span> Lock Doors {quickActionsData.doors?.length > 0 && <span className={`text-[10px] opacity-40 transition-transform duration-300 ${expandedAction === 'doors_lock' ? 'rotate-90' : ''}`}>▶</span>}
-                            </button>
-                            {expandedAction === 'doors_lock' && (
-                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e]/80 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
-                                    <div className="max-h-64 overflow-y-auto themed-scroll">
-                                    {quickActionsData.doors?.map((item: any) => (
-                                        <button key={item.id} onClick={() => handleSubItemClick("door_lock", item, "Lock")}
-                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-red-500/20 hover:text-red-300 border-b border-white/5 last:border-0 truncate transition-colors">
-                                            {item.name}
-                                        </button>
-                                    ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("doors", "door_unlock_all", "Unlock all doors")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${expandedAction === 'doors_unlock' ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 border-emerald-500/40 text-emerald-100 shadow-[0_0_15px_-3px_rgba(16,185,129,0.2)]' : 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/15 hover:border-emerald-500/30 hover:shadow-[0_0_10px_-3px_rgba(16,185,129,0.1)]'}`}>
-                                <span className={`transition-transform duration-300 ${expandedAction === 'doors_unlock' ? 'scale-110' : ''}`}>🔓</span> Unlock Doors {quickActionsData.doors?.length > 0 && <span className={`text-[10px] opacity-40 transition-transform duration-300 ${expandedAction === 'doors_unlock' ? 'rotate-90' : ''}`}>▶</span>}
-                            </button>
-                            {expandedAction === 'doors_unlock' && (
-                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e]/80 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
-                                    <div className="max-h-64 overflow-y-auto themed-scroll">
-                                    {quickActionsData.doors?.map((item: any) => (
-                                        <button key={item.id} onClick={() => handleSubItemClick("door_unlock", item, "Unlock")}
-                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-emerald-500/20 hover:text-emerald-300 border-b border-white/5 last:border-0 truncate transition-colors">
-                                            {item.name}
-                                        </button>
-                                    ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Email Alert */}
-                        <button type="button" onClick={() => handleMainActionClick("email", "", "Send an email alert")}
-                            className="group inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/70 text-[12px] font-medium hover:bg-white/[0.08] hover:border-white/20 hover:shadow-[0_0_10px_-3px_rgba(255,255,255,0.05)] transition-all duration-300 active:scale-95">
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Protocols", icon: "🛡️", sheetType: "protocol", items: quickActionsData.sites || [], allPayloadType: "protocols_all", allMessage: "Show me the emergency response protocols" })}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Protocols" ? "bg-gradient-to-r from-red-500/20 to-rose-500/10 border-red-500/40 text-red-100 shadow-[0_0_15px_-3px_rgba(239,68,68,0.2)]" : "border-red-500/20 bg-red-500/5 text-red-300 hover:bg-red-500/15 hover:border-red-500/30"}`}>
+                            🛡️ Protocols <span className="text-[10px] opacity-40">▶</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Flash Strobe", icon: "⚡", sheetType: "strobe", items: quickActionsData.notifiers_visual || [], allPayloadType: "notifier_visual_all", allMessage: "Flash all strobes" })}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Flash Strobe" ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border-yellow-500/40 text-yellow-100 shadow-[0_0_15px_-3px_rgba(234,179,8,0.2)]" : "border-yellow-500/20 bg-yellow-500/5 text-yellow-300 hover:bg-yellow-500/15 hover:border-yellow-500/30"}`}>
+                            ⚡ Flash Strobe <span className="text-[10px] opacity-40">▶</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Audio Alert", icon: "🔊", sheetType: "standard", items: quickActionsData.notifiers_audio || [], allPayloadType: "notifier_audio_all", allMessage: "Send audio alert to all speakers", itemPayloadType: "notifier_audio", itemLabelPrefix: "Play alert at" })}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Audio Alert" ? "bg-gradient-to-r from-orange-500/20 to-amber-500/10 border-orange-500/40 text-orange-100 shadow-[0_0_15px_-3px_rgba(249,115,22,0.2)]" : "border-orange-500/20 bg-orange-500/5 text-orange-300 hover:bg-orange-500/15 hover:border-orange-500/30"}`}>
+                            🔊 Audio Alert <span className="text-[10px] opacity-40">▶</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Lock Doors", icon: "🔒", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_lock_all", allMessage: "Lock all doors", itemPayloadType: "door_lock", itemLabelPrefix: "Lock" })}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Lock Doors" ? "bg-gradient-to-r from-indigo-500/20 to-violet-500/10 border-indigo-500/40 text-indigo-100 shadow-[0_0_15px_-3px_rgba(99,102,241,0.2)]" : "border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500/15 hover:border-indigo-500/30"}`}>
+                            🔒 Lock Doors <span className="text-[10px] opacity-40">▶</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Unlock Doors", icon: "🔓", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_unlock_all", allMessage: "Unlock all doors", itemPayloadType: "door_unlock", itemLabelPrefix: "Unlock" })}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Unlock Doors" ? "bg-gradient-to-r from-emerald-500/20 to-teal-500/10 border-emerald-500/40 text-emerald-100 shadow-[0_0_15px_-3px_rgba(16,185,129,0.2)]" : "border-emerald-500/20 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/15 hover:border-emerald-500/30"}`}>
+                            🔓 Unlock Doors <span className="text-[10px] opacity-40">▶</span>
+                        </button>
+                        <button type="button" onClick={() => sendAll("Send an email alert")}
+                            className="group inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/70 text-[12px] font-medium hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 active:scale-95">
                             <span className="group-hover:scale-110 transition-transform duration-300">✉️</span> Email Alert
                         </button>
                     </div>
 
-                    {/* --- QUICK INFO GROUP --- */}
-                    <div className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-bold mb-2 mt-5 ml-1">Quick Info</div>
-                    <div className="flex flex-wrap gap-2 pb-2">
-                        {/* cameras */}
-                        <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("cameras", "camera_all", "Show me all cameras and their statuses")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${expandedAction === 'cameras' ? 'bg-gradient-to-r from-blue-500/20 to-sky-500/10 border-blue-500/40 text-blue-100 shadow-[0_0_15px_-3px_rgba(59,130,246,0.2)]' : 'border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white hover:shadow-[0_0_10px_-3px_rgba(255,255,255,0.05)]'}`}>
-                                <span className={`transition-transform duration-300 ${expandedAction === 'cameras' ? 'scale-110' : ''}`}>📹</span> Camera Status {quickActionsData.cameras?.length > 0 && <span className={`text-[10px] opacity-40 transition-transform duration-300 ${expandedAction === 'cameras' ? 'rotate-90' : ''}`}>▶</span>}
-                            </button>
-                            {expandedAction === 'cameras' && (
-                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e]/80 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
-                                    <div className="max-h-64 overflow-y-auto themed-scroll">
-                                    {quickActionsData.cameras?.map((item: any) => (
-                                        <button key={item.id} onClick={() => handleSubItemClick("camera_status", item, "Status for camera")}
-                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 flex justify-between items-center transition-colors">
-                                            <span className="truncate pr-2">{item.name}</span>
-                                            {item.status && <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${item.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-500'}`}>{item.status}</span>}
-                                        </button>
-                                    ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* doors info */}
-                        <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("doors", "door_all", "Show me all doors and their statuses")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${expandedAction === 'doors_status' ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/10 border-cyan-500/40 text-cyan-100 shadow-[0_0_15px_-3px_rgba(6,182,212,0.2)]' : 'border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white hover:shadow-[0_0_10px_-3px_rgba(255,255,255,0.05)]'}`}>
-                                <span className={`transition-transform duration-300 ${expandedAction === 'doors_status' ? 'scale-110' : ''}`}>🚪</span> Door Status {quickActionsData.doors?.length > 0 && <span className={`text-[10px] opacity-40 transition-transform duration-300 ${expandedAction === 'doors_status' ? 'rotate-90' : ''}`}>▶</span>}
-                            </button>
-                            {expandedAction === 'doors_status' && (
-                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e]/80 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
-                                    <div className="max-h-64 overflow-y-auto themed-scroll">
-                                    {quickActionsData.doors?.map((item: any) => (
-                                        <button key={item.id} onClick={() => handleSubItemClick("door_status", item, "Status for door")}
-                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 flex justify-between items-center transition-colors">
-                                            <span className="truncate pr-2">{item.name}</span>
-                                            {item.status && <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${item.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-500'}`}>{item.status}</span>}
-                                        </button>
-                                    ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* SOPs */}
-                        <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("sops", "sop_all", "Show me all available SOPs")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${expandedAction === 'sops' ? 'bg-gradient-to-r from-purple-500/20 to-fuchsia-500/10 border-purple-500/40 text-purple-100 shadow-[0_0_15px_-3px_rgba(168,85,247,0.2)]' : 'border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white hover:shadow-[0_0_10px_-3px_rgba(255,255,255,0.05)]'}`}>
-                                <span className={`transition-transform duration-300 ${expandedAction === 'sops' ? 'scale-110' : ''}`}>📖</span> SOPs {quickActionsData.sops?.length > 0 && <span className={`text-[10px] opacity-40 transition-transform duration-300 ${expandedAction === 'sops' ? 'rotate-90' : ''}`}>▶</span>}
-                            </button>
-                            {expandedAction === 'sops' && (
-                                <div className="absolute top-full left-0 mt-2 w-64 bg-[#1a1b1e]/80 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
-                                    <div className="max-h-64 overflow-y-auto themed-scroll">
-                                    {quickActionsData.sops?.map((item: any) => (
-                                        <button key={item.id} onClick={() => handleSubItemClick("sop", item, "Show SOP")}
-                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 truncate transition-colors">
-                                            {item.title || item.name}
-                                        </button>
-                                    ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Incident Reports */}
-                        <div className="relative">
-                            <button type="button" onClick={() => handleMainActionClick("incident_reports", "incident_report_all", "Show me all incident reports")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${expandedAction === 'incident_reports' ? 'bg-gradient-to-r from-rose-500/20 to-red-500/10 border-rose-500/40 text-rose-100 shadow-[0_0_15px_-3px_rgba(244,63,94,0.2)]' : 'border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white hover:shadow-[0_0_10px_-3px_rgba(255,255,255,0.05)]'}`}>
-                                <span className={`transition-transform duration-300 ${expandedAction === 'incident_reports' ? 'scale-110' : ''}`}>📋</span> Incident Report {quickActionsData.incident_reports?.length > 0 && <span className={`text-[10px] opacity-40 transition-transform duration-300 ${expandedAction === 'incident_reports' ? 'rotate-90' : ''}`}>▶</span>}
-                            </button>
-                            {expandedAction === 'incident_reports' && (
-                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e]/80 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
-                                    <div className="max-h-64 overflow-y-auto themed-scroll">
-                                    {quickActionsData.incident_reports?.map((item: any) => (
-                                        <button key={item.id} onClick={() => handleSubItemClick("incident_report", item, "Show incident report")}
-                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 flex flex-col transition-colors">
-                                            <span className="truncate w-full font-medium">Report {item.id.slice(0, 8)}</span>
-                                            {item.date_created && <span className="text-[10px] text-white/40">{new Date(item.date_created).toLocaleDateString()}</span>}
-                                        </button>
-                                    ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Recent Alerts */}
-                        <button type="button" onClick={() => sendQuickAction("Show me the recent alerts", JSON.stringify({ type: "recent_alerts_all", id: "", name: "" }))}
-                            className="group inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/70 text-[12px] font-medium hover:bg-white/[0.08] hover:border-white/20 hover:text-white hover:shadow-[0_0_10px_-3px_rgba(255,255,255,0.05)] transition-all duration-300 active:scale-95">
+                    {/* Quick Info group */}
+                    <div className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-bold ml-1 mt-4">Quick Info</div>
+                    <div className="flex flex-wrap gap-2 pb-1">
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Camera Status", icon: "📹", sheetType: "standard", items: quickActionsData.cameras || [], allPayloadType: "camera_all", allMessage: "Show me all cameras and their statuses", itemPayloadType: "camera", itemLabelPrefix: "Status for camera" })}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Camera Status" ? "bg-gradient-to-r from-blue-500/20 to-sky-500/10 border-blue-500/40 text-blue-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"}`}>
+                            📹 Camera Status <span className="text-[10px] opacity-40">▶</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Door Status", icon: "🚪", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_all", allMessage: "Show me all doors and their statuses", itemPayloadType: "door", itemLabelPrefix: "Status for door" })}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Door Status" ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/10 border-cyan-500/40 text-cyan-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"}`}>
+                            🚪 Door Status <span className="text-[10px] opacity-40">▶</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => openSheet({ title: "SOPs", icon: "📖", sheetType: "standard", items: quickActionsData.documents || [], allPayloadType: "sop_all", allMessage: "Show me all available SOPs", itemPayloadType: "sop", itemLabelPrefix: "Show SOP" })}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "SOPs" ? "bg-gradient-to-r from-purple-500/20 to-fuchsia-500/10 border-purple-500/40 text-purple-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"}`}>
+                            📖 SOPs <span className="text-[10px] opacity-40">▶</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Incident Reports", icon: "📋", sheetType: "incident", items: quickActionsData.incident_reports || [], allPayloadType: "incident_report_all", allMessage: "Show me all incident reports", itemPayloadType: "incident_report", itemLabelPrefix: "Show incident report" })}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Incident Reports" ? "bg-gradient-to-r from-rose-500/20 to-red-500/10 border-rose-500/40 text-rose-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"}`}>
+                            📋 Incident Reports <span className="text-[10px] opacity-40">▶</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => sendQuickAction("Show me the recent alerts", JSON.stringify({ type: "recent_alerts_all", id: "", name: "" }))}
+                            className="group inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/70 text-[12px] font-medium hover:bg-white/[0.08] hover:border-white/20 hover:text-white transition-all duration-300 active:scale-95">
                             <span className="group-hover:scale-110 transition-transform duration-300">🔔</span> Recent Alerts
                         </button>
                     </div>
                 </div>
             )}
 
+            {/* ─── BOTTOM SHEET ─── */}
+            {activeSheet && (
+                <>
+                    {/* Backdrop */}
+                    <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" onClick={closeSubmenu} />
+
+                    {/* Sheet panel */}
+                    <div className="fixed bottom-0 left-0 right-0 z-50 max-h-[72vh] flex flex-col bg-[#18191c] border-t border-white/10 rounded-t-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.7)] animate-in slide-in-from-bottom duration-300">
+
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07] flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xl">{activeSheet.icon}</span>
+                                <span className="text-white font-semibold text-[15px]">{activeSheet.title}</span>
+                                {activeSheet.items.length > 0 && (
+                                    <span className="text-[11px] text-white/40 bg-white/5 px-2 py-0.5 rounded-full">{activeSheet.items.length}</span>
+                                )}
+                            </div>
+                            <button onClick={closeSubmenu} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/60 transition-colors">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Scrollable list */}
+                        <div className="overflow-y-auto themed-scroll flex-1">
+
+                            {/* "All" — always first */}
+                            {activeSheet.allPayloadType && (
+                                <button
+                                    onClick={() => sendAll(activeSheet.allMessage!, activeSheet.allPayloadType)}
+                                    className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-white/5 active:bg-white/10 transition-colors border-b border-white/[0.06]">
+                                    <span className="w-9 h-9 flex items-center justify-center rounded-full bg-primary/20 text-primary text-[18px] flex-shrink-0">✦</span>
+                                    <div>
+                                        <div className="text-white font-medium text-[14px]">All {activeSheet.title}</div>
+                                        <div className="text-white/40 text-[11px] mt-0.5">
+                                            {activeSheet.sheetType === "protocol"
+                                                ? "List all emergency response protocols"
+                                                : activeSheet.items.length > 0 ? `Apply to all ${activeSheet.items.length} devices` : "Apply to all devices"}
+                                        </div>
+                                    </div>
+                                </button>
+                            )}
+
+                            {/* Protocol: site → protocol list */}
+                            {activeSheet.sheetType === "protocol" && activeSheet.items.map((site: any) => (
+                                <div key={site.id} className="border-b border-white/[0.05] last:border-0">
+                                    <button
+                                        onClick={() => setExpandedSite(prev => prev === site.id ? null : site.id)}
+                                        className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${expandedSite === site.id ? "bg-white/5 text-white" : "text-white/80 hover:bg-white/[0.04]"}`}>
+                                        <span className="font-medium text-[14px]">{site.name}</span>
+                                        <svg viewBox="0 0 24 24" className={`w-4 h-4 opacity-40 transition-transform ${expandedSite === site.id ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
+                                        </svg>
+                                    </button>
+                                    {expandedSite === site.id && (
+                                        <div className="px-3 pb-3 pt-2 bg-black/30 space-y-2">
+                                            {/* Row 1: Fire + Active Shooter */}
+                                            <div className="flex gap-2">
+                                                {[protocolActions[0], protocolActions[1]].map(proto => (
+                                                    <button key={proto.key}
+                                                        onClick={() => { handleProtocolSubmit(site, proto); closeSubmenu(); }}
+                                                        className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30 border border-red-500/20 text-white/90 text-[12px] font-medium transition-colors">
+                                                        <span className="text-xl">{proto.icon}</span>
+                                                        <span className="text-center leading-tight">{proto.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {/* Row 2: Fall/Medical + Intrusion */}
+                                            <div className="flex gap-2">
+                                                {[protocolActions[2], protocolActions[3]].map(proto => (
+                                                    <button key={proto.key}
+                                                        onClick={() => { handleProtocolSubmit(site, proto); closeSubmenu(); }}
+                                                        className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl bg-yellow-500/10 hover:bg-yellow-500/20 active:bg-yellow-500/30 border border-yellow-500/20 text-white/90 text-[12px] font-medium transition-colors">
+                                                        <span className="text-xl">{proto.icon}</span>
+                                                        <span className="text-center leading-tight">{proto.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {/* Row 3: General Alert — full width */}
+                                            <div>
+                                                <button
+                                                    onClick={() => { handleProtocolSubmit(site, protocolActions[4]); closeSubmenu(); }}
+                                                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 active:bg-orange-500/30 border border-orange-500/20 text-white/90 text-[12px] font-medium transition-colors">
+                                                    <span className="text-xl">{protocolActions[4].icon}</span>
+                                                    <span>{protocolActions[4].label}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+
+                            {/* Strobe: color buttons per device */}
+                            {activeSheet.sheetType === "strobe" && activeSheet.items.map((item: any) => (
+                                <div key={item.id} className="flex flex-col px-5 py-4 border-b border-white/[0.05] last:border-0">
+                                    <span className="text-[13px] text-white/80 font-medium mb-3 truncate">{item.name}</span>
+                                    <div className="flex items-center gap-2">
+                                        {(["green", "yellow", "red"] as const).map((color) => {
+                                            const cls = color === "green"
+                                                ? "bg-emerald-500/25 hover:bg-emerald-500/50 border-emerald-500/40 text-emerald-400"
+                                                : color === "yellow"
+                                                    ? "bg-yellow-500/25 hover:bg-yellow-500/50 border-yellow-500/40 text-yellow-400"
+                                                    : "bg-red-500/25 hover:bg-red-500/50 border-red-500/40 text-red-400";
+                                            return (
+                                                <button key={color}
+                                                    onClick={() => { handleStrobeFlash(item, color); closeSubmenu(); }}
+                                                    className={`flex-1 py-2.5 rounded-xl border text-[11px] font-bold tracking-wider text-center transition-colors capitalize ${cls}`}>
+                                                    {color}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Incident: id + date + status badge */}
+                            {activeSheet.sheetType === "incident" && activeSheet.items.map((item: any) => (
+                                <button key={item.id}
+                                    onClick={() => { handleSubItemClick(activeSheet.itemPayloadType!, item, activeSheet.itemLabelPrefix!); closeSubmenu(); }}
+                                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/5 active:bg-white/10 border-b border-white/[0.05] last:border-0 transition-colors">
+                                    <div>
+                                        <div className="text-[13px] text-white/90 font-medium">Report {item.id.slice(0, 8)}</div>
+                                        {item.date && <div className="text-[11px] text-white/40 mt-0.5">{item.date}</div>}
+                                    </div>
+                                    <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-bold ${item.status === "open" ? "bg-red-500/20 text-red-400" : item.status === "closed" ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"}`}>
+                                        {item.status}
+                                    </span>
+                                </button>
+                            ))}
+
+                            {/* Standard: plain item list */}
+                            {activeSheet.sheetType === "standard" && activeSheet.items.map((item: any) => (
+                                <button key={item.id}
+                                    onClick={() => { handleSubItemClick(activeSheet.itemPayloadType!, item, activeSheet.itemLabelPrefix!); closeSubmenu(); }}
+                                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/5 active:bg-white/10 border-b border-white/[0.05] last:border-0 transition-colors">
+                                    <span className="text-[14px] text-white/90 truncate pr-3">{item.name || item.title}</span>
+                                    {item.status && (
+                                        <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${item.status === "online" || item.status === "connected" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
+                                            {item.status}
+                                        </span>
+                                    )}
+                                </button>
+                            ))}
+
+                            {/* Empty state */}
+                            {activeSheet.items.length === 0 && activeSheet.sheetType !== "direct" && (
+                                <div className="px-5 py-10 text-center text-white/40 text-[13px]">
+                                    {loadingActions ? "Loading devices..." : "No devices found"}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* iPhone home bar safe area */}
+                        <div className="pb-6 flex-shrink-0" />
+                    </div>
+                </>
+            )}
+
             {/* Messages */}
-            <div
-                ref={scrollRef}
-                className="themed-scroll overscroll-contain flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-4"
-            >
+            <div ref={scrollRef} className="themed-scroll overscroll-contain flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-4">
                 {messages.map((m, i) => (
-                    <MessageBubble
-                        key={m.id}
-                        msg={m}
-                        isLast={i === messages.length - 1}
-                    />
+                    <MessageBubble key={m.id} msg={m} isLast={i === messages.length - 1} />
                 ))}
                 {sending && <TypingIndicator />}
             </div>
 
             {/* Input */}
-            <form
-                onSubmit={handleSend}
-                className="px-4 md:px-6 py-3 sm:py-4 border-t border-white/10 bg-[#121213]"
-            >
+            <form onSubmit={handleSend} className="px-4 md:px-6 py-3 sm:py-4 border-t border-white/10 bg-[#121213]">
                 <div className="flex items-center gap-2 sm:gap-3">
                     <input
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         placeholder="Ask me anything…"
-                        className="flex-1 min-w-0 h-12 md:h-12 rounded-xl bg-[#141415] border border-white/10 px-4 py-0 outline-none appearance-none placeholder:text-white/60 text-[16px] leading-6 focus:ring-2 focus:ring-primary/30 touch-manipulation"
+                        className="flex-1 min-w-0 h-12 rounded-xl bg-[#141415] border border-white/10 px-4 py-0 outline-none appearance-none placeholder:text-white/60 text-[16px] leading-6 focus:ring-2 focus:ring-primary/30 touch-manipulation"
                         aria-label="Message"
                     />
                     <button
                         type="submit"
                         disabled={sending || !input.trim() || !connected}
-                        className="btn-primary h-12 md:h-12 inline-flex items-center justify-center px-4 md:px-5 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation"
-                        aria-label="Send"
-                    >
+                        className="btn-primary h-12 inline-flex items-center justify-center px-4 md:px-5 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation"
+                        aria-label="Send">
                         Send
                     </button>
                 </div>

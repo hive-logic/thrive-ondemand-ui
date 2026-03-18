@@ -19,7 +19,7 @@ const subscribers = new Set<Subscriber>();
 export const AGENT_HOST =
   (typeof process !== "undefined" &&
     (process as any).env?.NEXT_PUBLIC_AGENT_HOST) ||
-  "agent.thrivelogic.ai";
+  "varca.thrivelogic.ai";
 
 function getUrl(): string {
   const base = `wss://${AGENT_HOST}/ws/ondemand`;

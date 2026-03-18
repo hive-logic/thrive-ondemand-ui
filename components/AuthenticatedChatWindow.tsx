@@ -2,6 +2,7 @@
 
 import React, { memo, useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
+import { fetchQuickActionsData } from "@/lib/backend-api";
 import {
     getAuthWS,
     isAuthWSOpen,
@@ -11,6 +12,7 @@ import {
     getOrCreateSessionId,
 } from "@/lib/auth-ws";
 import { getStoredAccessToken } from "@/lib/auth";
+import MarkdownMessage from "@/components/MarkdownMessage";
 
 type MessageAttachment = {
     type: "image" | "video";
@@ -164,11 +166,10 @@ function DocumentLink({ fileId }: { fileId: string }) {
         <button
             onClick={handleClick}
             disabled={loading}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm font-medium transition-colors ${loading
-                ? "bg-white/10 text-white/50 border-white/20 cursor-wait"
-                : "bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"
-                }`}
-            title={loading ? "Downloading..." : `Download document`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm font-medium transition-colors ${
+                loading ? "bg-white/10 text-white/50 border-white/20 cursor-wait" : "bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"
+            }`}
+            title={loading ? "Downloading..." : "Download document"}
         >
             {loading ? (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -230,13 +231,18 @@ const MessageBubble = memo(
                 className={`flex ${isUser ? "justify-end" : "justify-start"} ${props.isLast ? "message-in" : ""}`}
             >
                 <div
-                    className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${isUser
-                        ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
-                        : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
-                        }`}
+                    className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${
+                        isUser
+                            ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
+                            : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
+                    }`}
                 >
-                    <div className="whitespace-pre-wrap">
-                        {processDocumentReferences(props.msg.content)}
+                    <div>
+                        {isUser ? (
+                            <p className="whitespace-pre-wrap">{props.msg.content}</p>
+                        ) : (
+                            <MarkdownMessage content={props.msg.content} />
+                        )}
                     </div>
                     {props.msg.attachment && (
                         <div className="mt-2 space-y-1">
@@ -287,11 +293,49 @@ export default function AuthenticatedChatWindow() {
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [connected, setConnected] = useState(false);
+    const [actionsOpen, setActionsOpen] = useState(false);
+    const [quickActionsData, setQuickActionsData] = useState<Record<string, any>>({});
+    const [expandedAction, setExpandedAction] = useState<string | null>(null);
+    const [expandedSite, setExpandedSite] = useState<string | null>(null);
+    const [loadingActions, setLoadingActions] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const streamMsgIdRef = useRef<string | null>(null);
     const tokenQueueRef = useRef<string[]>([]);
     const flushTimerRef = useRef<number | null>(null);
     const flushCompletePendingRef = useRef(false);
+
+    // Fetch quick actions data
+    useEffect(() => {
+        if (!user?.customer?.id) return;
+        
+        async function loadActions() {
+            setLoadingActions(true);
+            try {
+                const token = getStoredAccessToken();
+                if (!token) return;
+                
+                const data = await fetchQuickActionsData(user!.customer!.id, token);
+                if (data) {
+                    setQuickActionsData(data);
+                }
+            } catch (err) {
+                console.error("Failed to load quick actions data:", err);
+            } finally {
+                setLoadingActions(false);
+            }
+        }
+        
+        loadActions();
+    }, [user]);
+
+    // Protocol action definitions (matching Directus)
+    const protocolActions = [
+        { key: "fire", icon: "🔥", label: "Fire", color: "red", severity: 10 },
+        { key: "active_shooter", icon: "🔫", label: "Active Shooter", color: "red", severity: 10 },
+        { key: "fall_medical", icon: "🤕", label: "Fall / Medical", color: "yellow", severity: 7 },
+        { key: "intrusion", icon: "🚨", label: "Intrusion", color: "red", severity: 8 },
+        { key: "general_alert", icon: "⚠️", label: "General Alert", color: "red", severity: 9 },
+    ];
 
     // Welcome message
     useEffect(() => {
@@ -352,13 +396,24 @@ export default function AuthenticatedChatWindow() {
                         scheduleFlush();
                     }
                 } catch {
-                    // Plain string response
+                    // Plain string response — filter out errors and system messages
+                    const raw = String(event.data);
+                    if (
+                        raw.startsWith("Invalid") ||
+                        raw.startsWith("Error") ||
+                        raw.includes("pong") ||
+                        raw.includes("ping")
+                    ) {
+                        // eslint-disable-next-line no-console
+                        console.log("Auth WS system/error (ignored):", raw);
+                        return;
+                    }
                     setMessages((prev) => [
                         ...prev,
                         {
                             id: crypto.randomUUID(),
                             role: "assistant",
-                            content: String(event.data),
+                            content: raw,
                         },
                     ]);
                 }
@@ -422,6 +477,93 @@ export default function AuthenticatedChatWindow() {
         };
     }, []);
 
+    function sendQuickAction(text: string, payloadStr?: string) {
+        if (!isAuthWSOpen() || sending) return;
+        setActionsOpen(false);
+        setExpandedAction(null);
+        setExpandedSite(null);
+
+        // Always show the text to the user
+        const userMsg: Message = {
+            id: crypto.randomUUID(),
+            role: "user",
+            content: text,
+        };
+        setMessages((m) => [...m, userMsg]);
+
+        const ws = getAuthWS();
+        const userMeta = getAuthUserMeta();
+        
+        // If a deterministic payload is provided, send that to the bot instead of the text
+        const messageToSend = payloadStr ? `###quick_actions###${payloadStr}###` : text;
+        
+        const payload = {
+            user_uuid: userMeta?.id,
+            message: messageToSend,
+            time: new Date().toISOString(),
+            user_meta: userMeta,
+            session_id: getOrCreateSessionId(),
+        };
+
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(payload));
+            setSending(true);
+        }
+    }
+
+    function handleMainActionClick(type: string, payloadType: string, label: string) {
+        if (!quickActionsData[type] || quickActionsData[type].length === 0) {
+            // Send the "all" action if there are no sub-items
+            if (payloadType) {
+                const payload = JSON.stringify({ type: payloadType, id: "", name: "" });
+                sendQuickAction(`Executing action for all: ${label}`, payload);
+            }
+            return;
+        }
+
+        // Toggle sub-menu
+        if (expandedAction === type) {
+            setExpandedAction(null);
+            setExpandedSite(null);
+        } else {
+            setExpandedAction(type);
+            setExpandedSite(null);
+        }
+    }
+
+    function handleProtocolSubmit(site: any, proto: any) {
+        const payload = JSON.stringify({
+            type: "protocol_execute",
+            site_id: site.id,
+            site_name: site.name,
+            protocol: proto.key,
+            protocol_label: proto.label,
+            color: proto.color,
+            severity: proto.severity,
+        });
+        sendQuickAction(`Initiating ${proto.label} protocol at ${site.name}`, payload);
+    }
+
+    function handleSubItemClick(actionType: string, item: any, labelPrefix: string) {
+        const payload = JSON.stringify({
+            type: actionType,
+            id: item.id,
+            name: item.name || item.title || item.date || "",
+        });
+        const itemName = item.name || item.title || item.date || "Selected item";
+        sendQuickAction(`${labelPrefix}: ${itemName}`, payload);
+    }
+
+    function handleStrobeFlash(item: any, color: string) {
+        const payload = JSON.stringify({
+            type: "notifier_visual_color",
+            id: item.id,
+            name: item.name || "",
+            color: color,
+        });
+        sendQuickAction(`Flashing ${color} strobe at ${item.name}`, payload);
+    }
+
     async function handleSend(e: React.FormEvent) {
         e.preventDefault();
         const text = input.trim();
@@ -445,7 +587,7 @@ export default function AuthenticatedChatWindow() {
             message: text,
             time: new Date().toISOString(),
             user_meta: userMeta,
-            session_id: getOrCreateSessionId(), // Frontend-generated UUID4 for chat history
+            session_id: getOrCreateSessionId(),
         };
 
         // eslint-disable-next-line no-console
@@ -477,7 +619,7 @@ export default function AuthenticatedChatWindow() {
             </div>
 
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 md:px-6 py-4 border-b border-white/10">
+            <div className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-white/10">
                 <div className="flex items-center gap-2">
                     <span
                         className={`h-2.5 w-2.5 rounded-full ${connected ? "bg-emerald-400" : "bg-red-400"
@@ -486,10 +628,245 @@ export default function AuthenticatedChatWindow() {
                     />
                     <div className="text-sm font-semibold">VARCA Assistant</div>
                 </div>
-                <div className="ml-auto text-xs text-white/60">
-                    {!connected ? "Reconnecting…" : "Full Access Mode"}
+                <div className="ml-auto flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setActionsOpen((o) => !o)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                            actionsOpen
+                                ? "bg-white/15 border-white/20 text-white"
+                                : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
+                        }`}
+                    >
+                        <span>⚡</span>
+                        <span>Actions</span>
+                        <svg
+                            className={`w-3 h-3 transition-transform ${actionsOpen ? "rotate-180" : ""}`}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div className="text-xs text-white/40">
+                        {!connected ? "Reconnecting…" : ""}
+                    </div>
                 </div>
             </div>
+
+            {/* Quick Actions Panel */}
+            {actionsOpen && (
+                <div className="px-4 md:px-6 py-3 border-b border-white/10 bg-white/[0.02] space-y-3 animate-in fade-in slide-in-from-top-2 duration-300 relative z-10">
+                    
+                    {loadingActions && (
+                        <div className="absolute inset-0 flex border-b items-center justify-center bg-black/50 backdrop-blur-sm z-20 rounded-xl">
+                            <div className="flex items-center gap-2 text-white/70 text-sm">
+                                <svg className="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                <span>Loading your devices...</span>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* --- ACTIONS GROUP --- */}
+                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-semibold mb-1">Actions</div>
+                    <div className="flex flex-wrap gap-2">
+                        {/* Protocols */}
+                        <div className="relative">
+                            <button type="button" onClick={() => handleMainActionClick("sites", "protocol", "Protocols")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'sites' ? 'bg-primary/20 border-primary/50 text-white' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}>
+                                <span>🛡️</span> Protocols {quickActionsData.sites?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'sites' ? 'rotate-90' : ''}`}>▶</span>}
+                            </button>
+                            {expandedAction === 'sites' && (
+                                <div className="absolute top-full left-0 mt-2 w-64 bg-[#1a1b1e] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    {quickActionsData.sites?.map((site: any) => (
+                                        <div key={site.id} className="border-b border-white/5 last:border-0 relative">
+                                            <button type="button" onClick={() => setExpandedSite(expandedSite === site.id ? null : site.id)}
+                                                className={`w-full text-left px-3 py-2.5 text-[12px] font-medium transition-colors flex items-center justify-between ${expandedSite === site.id ? "bg-white/10 text-white" : "text-white/80 hover:bg-white/5"}`}>
+                                                <span>{site.name}</span>
+                                                <span className={`transition-transform opacity-50 text-[10px] ${expandedSite === site.id ? "rotate-90" : ""}`}>▶</span>
+                                            </button>
+                                            
+                                            {/* Protocol Grid Dropdown */}
+                                            {expandedSite === site.id && (
+                                                <div className="bg-black/40 p-2 grid grid-cols-1 gap-1 border-t border-white/5 shadow-inner">
+                                                    {protocolActions.map((proto) => (
+                                                        <button key={proto.key} onClick={() => handleProtocolSubmit(site, proto)}
+                                                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/90 text-[12px] font-medium text-left">
+                                                            <span className="text-base">{proto.icon}</span>
+                                                            <span>{proto.label}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Visual Notifiers (Strobes) */}
+                        <div className="relative">
+                            <button type="button" onClick={() => handleMainActionClick("notifiers_visual", "notifier_visual_all", "Flash Strobe")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'notifiers_visual' ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-100' : 'border-yellow-500/20 bg-yellow-500/5 text-yellow-300 hover:bg-yellow-500/10'}`}>
+                                <span>⚡</span> Flash Strobe {quickActionsData.notifiers_visual?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'notifiers_visual' ? 'rotate-90' : ''}`}>▶</span>}
+                            </button>
+                            {expandedAction === 'notifiers_visual' && (
+                                <div className="absolute top-full left-0 mt-2 w-64 bg-[#1a1b1e] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    <div className="max-h-64 overflow-y-auto themed-scroll">
+                                    {quickActionsData.notifiers_visual?.map((item: any) => (
+                                        <div key={item.id} className="flex flex-col px-3 py-2.5 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                                            <span className="text-[12px] text-white/90 mb-2 truncate">{item.name}</span>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <button onClick={() => handleStrobeFlash(item, 'green')} className="flex-1 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/50 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold tracking-widest text-center transition-colors">GREEN</button>
+                                                <button onClick={() => handleStrobeFlash(item, 'yellow')} className="flex-1 py-1.5 rounded bg-yellow-500/20 hover:bg-yellow-500/50 border border-yellow-500/30 text-yellow-400 text-[10px] font-bold tracking-widest text-center transition-colors">YELLOW</button>
+                                                <button onClick={() => handleStrobeFlash(item, 'red')} className="flex-1 py-1.5 rounded bg-red-500/20 hover:bg-red-500/50 border border-red-500/30 text-red-500 text-[10px] font-bold tracking-widest text-center transition-colors">RED</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* audio */}
+                        <div className="relative">
+                            <button type="button" onClick={() => handleMainActionClick("notifiers_audio", "notifier_audio_all", "Audio Alert")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'notifiers_audio' ? 'bg-orange-500/20 border-orange-500/50 text-orange-100' : 'border-orange-500/20 bg-orange-500/5 text-orange-300 hover:bg-orange-500/10'}`}>
+                                <span>🔊</span> Audio Alert {quickActionsData.notifiers_audio?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'notifiers_audio' ? 'rotate-90' : ''}`}>▶</span>}
+                            </button>
+                            {expandedAction === 'notifiers_audio' && (
+                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    <div className="max-h-64 overflow-y-auto themed-scroll">
+                                    {quickActionsData.notifiers_audio?.map((item: any) => (
+                                        <button key={item.id} onClick={() => handleSubItemClick("notifier_audio", item, "Play alert at")}
+                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 truncate transition-colors">
+                                            {item.name}
+                                        </button>
+                                    ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* doors */}
+                        <div className="relative">
+                            <button type="button" onClick={() => handleMainActionClick("doors", "door_lock_all", "Lock Doors")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'doors_lock' ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-100' : 'border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500/10'}`}>
+                                <span>🔒</span> Lock Doors {quickActionsData.doors?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'doors_lock' ? 'rotate-90' : ''}`}>▶</span>}
+                            </button>
+                            {expandedAction === 'doors_lock' && (
+                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    <div className="max-h-64 overflow-y-auto themed-scroll">
+                                    {quickActionsData.doors?.map((item: any) => (
+                                        <button key={item.id} onClick={() => handleSubItemClick("door_lock", item, "Lock")}
+                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-red-500/20 hover:text-red-300 border-b border-white/5 last:border-0 truncate transition-colors">
+                                            {item.name}
+                                        </button>
+                                    ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="relative">
+                            <button type="button" onClick={() => handleMainActionClick("doors", "door_unlock_all", "Unlock Doors")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'doors_unlock' ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-100' : 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/10'}`}>
+                                <span>🔓</span> Unlock Doors {quickActionsData.doors?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'doors_unlock' ? 'rotate-90' : ''}`}>▶</span>}
+                            </button>
+                            {expandedAction === 'doors_unlock' && (
+                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    <div className="max-h-64 overflow-y-auto themed-scroll">
+                                    {quickActionsData.doors?.map((item: any) => (
+                                        <button key={item.id} onClick={() => handleSubItemClick("door_unlock", item, "Unlock")}
+                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-emerald-500/20 hover:text-emerald-300 border-b border-white/5 last:border-0 truncate transition-colors">
+                                            {item.name}
+                                        </button>
+                                    ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* --- QUICK INFO GROUP --- */}
+                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-semibold mb-1 mt-4">Quick Info</div>
+                    <div className="flex flex-wrap gap-2 pb-2">
+                        {/* cameras */}
+                        <div className="relative">
+                            <button type="button" onClick={() => handleMainActionClick("cameras", "camera_status_all", "Camera Status")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'cameras' ? 'bg-blue-500/20 border-blue-500/50 text-blue-100' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}>
+                                <span>📹</span> Camera Status {quickActionsData.cameras?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'cameras' ? 'rotate-90' : ''}`}>▶</span>}
+                            </button>
+                            {expandedAction === 'cameras' && (
+                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    <div className="max-h-64 overflow-y-auto themed-scroll">
+                                    {quickActionsData.cameras?.map((item: any) => (
+                                        <button key={item.id} onClick={() => handleSubItemClick("camera_status", item, "Status for camera")}
+                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 flex justify-between items-center transition-colors">
+                                            <span className="truncate pr-2">{item.name}</span>
+                                            {item.status && <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${item.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-500'}`}>{item.status}</span>}
+                                        </button>
+                                    ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* doors info */}
+                        <div className="relative">
+                            <button type="button" onClick={() => handleMainActionClick("doors", "door_status_all", "Door Status")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'doors_status' ? 'bg-blue-500/20 border-blue-500/50 text-blue-100' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}>
+                                <span>🚪</span> Door Status {quickActionsData.doors?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'doors_status' ? 'rotate-90' : ''}`}>▶</span>}
+                            </button>
+                            {expandedAction === 'doors_status' && (
+                                <div className="absolute top-full left-0 mt-2 w-56 bg-[#1a1b1e] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    <div className="max-h-64 overflow-y-auto themed-scroll">
+                                    {quickActionsData.doors?.map((item: any) => (
+                                        <button key={item.id} onClick={() => handleSubItemClick("door_status", item, "Status for door")}
+                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 flex justify-between items-center transition-colors">
+                                            <span className="truncate pr-2">{item.name}</span>
+                                            {item.status && <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${item.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-500'}`}>{item.status}</span>}
+                                        </button>
+                                    ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* SOPs */}
+                        <div className="relative">
+                            <button type="button" onClick={() => handleMainActionClick("sops", "sop_all", "SOPs")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all active:scale-95 ${expandedAction === 'sops' ? 'bg-blue-500/20 border-blue-500/50 text-blue-100' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}>
+                                <span>📖</span> SOPs {quickActionsData.sops?.length > 0 && <span className={`text-[10px] opacity-50 transition-transform ${expandedAction === 'sops' ? 'rotate-90' : ''}`}>▶</span>}
+                            </button>
+                            {expandedAction === 'sops' && (
+                                <div className="absolute top-full left-0 mt-2 w-64 bg-[#1a1b1e] border border-white/10 rounded-xl shadow-2xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    <div className="max-h-64 overflow-y-auto themed-scroll">
+                                    {quickActionsData.sops?.map((item: any) => (
+                                        <button key={item.id} onClick={() => handleSubItemClick("sop", item, "Show SOP")}
+                                            className="w-full text-left px-3 py-2.5 text-[12px] text-white/80 hover:bg-white/10 hover:text-white border-b border-white/5 last:border-0 truncate transition-colors">
+                                            {item.title || item.name}
+                                        </button>
+                                    ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Direct action single clicks */}
+                        <button type="button" onClick={() => sendQuickAction("Help me create an incident report")}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-500/20 bg-red-500/5 text-red-300 text-[12px] font-medium hover:bg-red-500/10 transition-all active:scale-95">
+                            <span>📋</span> Incident Report
+                        </button>
+                        <button type="button" onClick={() => sendQuickAction("Show me the recent alerts")}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white/80 text-[12px] font-medium hover:bg-white/10 transition-all active:scale-95">
+                            <span>🔔</span> Recent Alerts
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Messages */}
             <div

@@ -115,3 +115,27 @@ export async function saveSubscription(activityId: string, userId: string, subsc
     throw error;
   }
 }
+
+export async function fetchQuickActionsData(customerId: string, accessToken: string): Promise<Record<string, any> | null> {
+  console.log('[fetchQuickActionsData] Fetching for customer:', customerId);
+  try {
+    const url = `${API_BASE_URL}/v1/quick_actions_data?customer_id=${encodeURIComponent(customerId)}&token=${encodeURIComponent(accessToken)}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('[fetchQuickActionsData] Failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('[fetchQuickActionsData] Error:', error);
+    return null;
+  }
+}

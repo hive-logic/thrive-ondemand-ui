@@ -187,6 +187,34 @@ const TypingIndicator = memo(function TypingIndicator() {
     );
 });
 
+/** Compact pill that shows which tool the agent is calling */
+const ToolCallPill = memo(function ToolCallPill({ toolName }: { toolName: string }) {
+    // Map internal tool names to user-friendly labels
+    const friendlyNames: Record<string, string> = {
+        incident_reporter_agent: "Generating report",
+        create_incident_report: "Creating PDF",
+        query_sop: "Searching SOPs",
+        web_search: "Searching web",
+        check_weather: "Checking weather",
+        execute_emergency_protocol: "Activating protocol",
+        send_visual_alert: "Sending visual alert",
+        send_audio_alert: "Sending audio alert",
+        send_voice_alert: "Sending voice alert",
+    };
+    const label = friendlyNames[toolName] || "Processing";
+    return (
+        <div className="flex justify-start message-in">
+            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-primary/10 border border-primary/20 backdrop-blur">
+                <svg className="w-3.5 h-3.5 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span className="text-[12px] font-medium text-primary/90">⚙️ {label}…</span>
+            </div>
+        </div>
+    );
+});
+
 // ─── Bottom sheet config type ───────────────────────────────────────────────
 type SheetConfig = {
     title: string;
@@ -205,6 +233,7 @@ export default function AuthenticatedChatWindow() {
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [connected, setConnected] = useState(false);
+    const [activeToolName, setActiveToolName] = useState<string | null>(null);
     const [actionsOpen, setActionsOpen] = useState(false);
     const [quickActionsData, setQuickActionsData] = useState<Record<string, any>>({});
     const [loadingActions, setLoadingActions] = useState(false);
@@ -293,7 +322,22 @@ Use the quick buttons below to get started.`;
                 try {
                     const data = JSON.parse(event.data);
                     // console.log("Auth WS message:", data);
+
+                    // ── Handle tool_info messages ──
+                    if (data.type === "tool_info") {
+                        const name = data.content?.name || data.content?.id || "";
+                        setActiveToolName(name);
+                        return;
+                    }
+
+                    // ── Handle followup_suggestions ──
+                    if (data.type === "followup_suggestions") return;
+
                     if (data.type !== "message") return;
+
+                    // Clear tool indicator when real content starts arriving
+                    setActiveToolName(null);
+
                     if (!streamMsgIdRef.current) {
                         const newId = crypto.randomUUID();
                         streamMsgIdRef.current = newId;
@@ -340,8 +384,11 @@ Use the quick buttons below to get started.`;
             }
             if (flushCompletePendingRef.current) {
                 flushCompletePendingRef.current = false;
+                // Reset stream ID so subsequent messages create new bubbles
                 streamMsgIdRef.current = null;
-                setSending(false);
+                // Only stop "sending" if no tool call is active
+                // (more messages may follow after the tool completes)
+                if (!activeToolName) setSending(false);
             }
             flushTimerRef.current = null;
         };
@@ -785,6 +832,7 @@ Use the quick buttons below to get started.`;
                 {messages.map((m, i) => (
                     <MessageBubble key={m.id} msg={m} isLast={i === messages.length - 1} />
                 ))}
+                {activeToolName && <ToolCallPill toolName={activeToolName} />}
                 {sending && <TypingIndicator />}
 
                 {/* Quick chips — shown only when no conversation started yet */}

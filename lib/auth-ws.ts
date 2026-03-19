@@ -9,7 +9,7 @@ import { getStoredAccessToken, getStoredUser } from "./auth";
 const AGENT_HOST =
     (typeof process !== "undefined" &&
         (process as any).env?.NEXT_PUBLIC_AGENT_HOST) ||
-    "agent.thrivelogic.ai";
+    "";
 
 let authSocket: WebSocket | null = null;
 let retries = 0;

@@ -1,4 +1,5 @@
-const API_BASE_URL = 'https://varca.thrivelogic.ai';
+const AGENT_HOST = (typeof process !== "undefined" && (process as any).env?.NEXT_PUBLIC_AGENT_HOST) || "";
+const API_BASE_URL = `https://${AGENT_HOST}`;
 
 export async function checkUserId(activityId: string, email: string): Promise<string | null> {
   try {

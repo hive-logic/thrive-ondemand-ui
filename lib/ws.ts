@@ -10,16 +10,11 @@ type Subscriber = {
 const subscribers = new Set<Subscriber>();
 
 // Base domain for the agent/WS server and HTTP APIs, configurable via env.
-// In development this will default to "agent.thrivelogic.ai".
-// In production you can set NEXT_PUBLIC_AGENT_HOST to "varca.thrivelogic.ai".
-
-
-
-
+// Set NEXT_PUBLIC_AGENT_HOST in .env to control which server to connect to.
 export const AGENT_HOST =
   (typeof process !== "undefined" &&
     (process as any).env?.NEXT_PUBLIC_AGENT_HOST) ||
-  "varca.thrivelogic.ai";
+  "";
 
 function getUrl(): string {
   const base = `wss://${AGENT_HOST}/ws/ondemand`;

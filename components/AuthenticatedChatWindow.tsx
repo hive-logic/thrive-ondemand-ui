@@ -2,7 +2,7 @@
 
 import React, { memo, useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { fetchQuickActionsData } from "@/lib/backend-api";
+import { fetchQuickActionsData, fetchAccessZones } from "@/lib/backend-api";
 import {
     getAuthWS,
     isAuthWSOpen,
@@ -208,6 +208,8 @@ export default function AuthenticatedChatWindow() {
     const [actionsOpen, setActionsOpen] = useState(false);
     const [quickActionsData, setQuickActionsData] = useState<Record<string, any>>({});
     const [loadingActions, setLoadingActions] = useState(false);
+    const [actionsRefreshKey, setActionsRefreshKey] = useState(0);
+    const [accessZonesData, setAccessZonesData] = useState<any[]>([]);
     const [activeSheet, setActiveSheet] = useState<SheetConfig | null>(null);
     const [expandedSite, setExpandedSite] = useState<string | null>(null);
 
@@ -226,7 +228,10 @@ export default function AuthenticatedChatWindow() {
                 const token = getStoredAccessToken();
                 if (!token) return;
                 const data = await fetchQuickActionsData(user!.customer!.id, token);
-                if (data) setQuickActionsData(data);
+                if (data) {
+                    setQuickActionsData(data);
+                    if (data.access_zones) setAccessZonesData(data.access_zones);
+                }
             } catch (err) {
                 console.error("Failed to load quick actions data:", err);
             } finally {
@@ -235,6 +240,18 @@ export default function AuthenticatedChatWindow() {
         }
         loadActions();
     }, [user]);
+
+    // Lightweight zone-only refresh — returns fresh zones for immediate use
+    async function refreshZones(): Promise<any[] | null> {
+        const token = getStoredAccessToken();
+        if (!token || !user?.customer?.id) return null;
+        const data = await fetchAccessZones(user.customer.id, token);
+        if (data?.access_zones) {
+            setAccessZonesData(data.access_zones);
+            return data.access_zones;
+        }
+        return null;
+    }
 
     // Protocol action definitions
     const protocolActions = [
@@ -353,6 +370,17 @@ Use the quick buttons below to get started.`;
         setActiveSheet(prev => (prev?.title === cfg.title ? null : cfg));
     }
 
+    function openZoneSheet(cfg: Omit<SheetConfig, "items">) {
+        const isToggle = activeSheet?.title === cfg.title;
+        setExpandedSite(null);
+        if (isToggle) { setActiveSheet(null); return; }
+        // Open immediately with cached zones, then replace with fresh data
+        setActiveSheet({ ...cfg, items: accessZonesData });
+        refreshZones().then(fresh => {
+            if (fresh) setActiveSheet(prev => prev?.title === cfg.title ? { ...prev, items: fresh } : prev);
+        });
+    }
+
     function closeSubmenu() { setActiveSheet(null); setExpandedSite(null); }
 
     function sendAll(displayMessage: string, payloadType?: string) {
@@ -468,24 +496,26 @@ Use the quick buttons below to get started.`;
                         </button>
                         {/* Zone-wide door commands */}
                         <button type="button"
-                            onClick={() => openSheet({ title: "Zone Lock", icon: "🔒", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_lock_all", allMessage: "Lock down all access zones", itemPayloadType: "door_lock", itemLabelPrefix: "Lock" })}
+                            onClick={() => openZoneSheet({ title: "Zone Lock", icon: "🔒", sheetType: "standard", allPayloadType: "door_lock_all", allMessage: "Lock down all access zones", itemPayloadType: "zone_lock_single", itemLabelPrefix: "Lock down zone" })}
                             className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Zone Lock" ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-100" : "border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500/15"}`}>
                             <span className="text-lg">🔒</span>
                             <span>Zone Lock</span>
                         </button>
                         <button type="button"
-                            onClick={() => openSheet({ title: "Free Access", icon: "🔓", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_unlock_all", allMessage: "Enable free access on all access zones", itemPayloadType: "door_unlock", itemLabelPrefix: "Open" })}
+                            onClick={() => openZoneSheet({ title: "Free Access", icon: "🔓", sheetType: "standard", allPayloadType: "door_unlock_all", allMessage: "Enable free access on all access zones", itemPayloadType: "zone_free_single", itemLabelPrefix: "Free access zone" })}
                             className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Free Access" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-100" : "border-emerald-500/20 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/15"}`}>
                             <span className="text-lg">🔓</span>
                             <span>Free Access</span>
                         </button>
-                        <button type="button" onClick={() => sendAll("Return all access zones to normal secure operation", "zone_secure")}
-                            className="flex flex-col items-center justify-center gap-1 py-3 rounded-xl border border-teal-500/20 bg-teal-500/5 text-teal-300 text-[11px] font-medium hover:bg-teal-500/15 transition-all duration-300 active:scale-95">
+                        <button type="button"
+                            onClick={() => openZoneSheet({ title: "Secure Zone", icon: "🟢", sheetType: "standard", allPayloadType: "zone_secure", allMessage: "Return all access zones to normal secure operation", itemPayloadType: "zone_secure_single", itemLabelPrefix: "Secure zone" })}
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Secure Zone" ? "bg-teal-500/20 border-teal-500/40 text-teal-100" : "border-teal-500/20 bg-teal-500/5 text-teal-300 hover:bg-teal-500/15"}`}>
                             <span className="text-lg">🟢</span>
                             <span>Secure Zone</span>
                         </button>
-                        <button type="button" onClick={() => sendAll("Cancel lockdown on all access zones", "zone_cancel_lock_down")}
-                            className="flex flex-col items-center justify-center gap-1 py-3 rounded-xl border border-violet-500/20 bg-violet-500/5 text-violet-300 text-[11px] font-medium hover:bg-violet-500/15 transition-all duration-300 active:scale-95">
+                        <button type="button"
+                            onClick={() => openZoneSheet({ title: "Cancel Lock", icon: "❌", sheetType: "standard", allPayloadType: "zone_cancel_lock_down", allMessage: "Cancel lockdown on all access zones", itemPayloadType: "zone_cancel_single", itemLabelPrefix: "Cancel lockdown zone" })}
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Cancel Lock" ? "bg-violet-500/20 border-violet-500/40 text-violet-100" : "border-violet-500/20 bg-violet-500/5 text-violet-300 hover:bg-violet-500/15"}`}>
                             <span className="text-lg">❌</span>
                             <span>Cancel Lock</span>
                         </button>
@@ -507,7 +537,7 @@ Use the quick buttons below to get started.`;
                             <span>Cameras</span>
                         </button>
                         <button type="button"
-                            onClick={() => openSheet({ title: "Door Status", icon: "\uD83D\uDEAA", sheetType: "zone_doors", items: quickActionsData.access_zones || [], allPayloadType: "door_all", allMessage: "Show me all doors and their statuses" })}
+                            onClick={() => openZoneSheet({ title: "Door Status", icon: "\uD83D\uDEAA", sheetType: "zone_doors", allPayloadType: "door_all", allMessage: "Show me all doors and their statuses" })}
                             className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Door Status" ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:text-white"}`}>
                             <span className="text-lg">🚪</span>
                             <span>Doors</span>
@@ -667,18 +697,29 @@ Use the quick buttons below to get started.`;
                             ))}
 
                             {/* Standard: plain item list */}
-                            {activeSheet.sheetType === "standard" && activeSheet.items.map((item: any) => (
-                                <button key={item.id}
-                                    onClick={() => { handleSubItemClick(activeSheet.itemPayloadType!, item, activeSheet.itemLabelPrefix!); closeSubmenu(); }}
-                                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/5 active:bg-white/10 border-b border-white/[0.05] last:border-0 transition-colors">
-                                    <span className="text-[14px] text-white/90 truncate pr-3">{item.name || item.title}</span>
-                                    {item.status && (
-                                        <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${item.status === "online" || item.status === "connected" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
-                                            {item.status}
-                                        </span>
-                                    )}
-                                </button>
-                            ))}
+                            {activeSheet.sheetType === "standard" && activeSheet.items.map((item: any) => {
+                                const statusColor = (() => {
+                                    const s = item.status;
+                                    if (!s) return null;
+                                    if (s === "lock_down") return "bg-red-500/20 text-red-400";
+                                    if (s === "free") return "bg-blue-500/20 text-blue-400";
+                                    if (s === "secure" || s === "online" || s === "connected") return "bg-emerald-500/20 text-emerald-400";
+                                    return "bg-white/10 text-white/50";
+                                })();
+                                const statusLabel = item.status === "lock_down" ? "locked" : item.status === "cancel_lock_down" ? "secure" : item.status;
+                                return (
+                                    <button key={item.id}
+                                        onClick={() => { handleSubItemClick(activeSheet.itemPayloadType!, item, activeSheet.itemLabelPrefix!); closeSubmenu(); }}
+                                        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/5 active:bg-white/10 border-b border-white/[0.05] last:border-0 transition-colors">
+                                        <span className="text-[14px] text-white/90 truncate pr-3">{item.name || item.title}</span>
+                                        {statusColor && (
+                                            <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${statusColor}`}>
+                                                {statusLabel}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
 
                             {/* Zone-Doors: zone accordion → individual doors */}
                             {activeSheet.sheetType === "zone_doors" && activeSheet.items.map((zone: any) => (
@@ -691,6 +732,12 @@ Use the quick buttons below to get started.`;
                                             <span className="font-medium text-[14px]">{zone.name}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            {zone.status && (() => {
+                                                const s = zone.status;
+                                                const color = s === "lock_down" ? "bg-red-500/20 text-red-400" : s === "free" ? "bg-blue-500/20 text-blue-400" : s === "secure" ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50";
+                                                const label = s === "lock_down" ? "locked" : s;
+                                                return <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded-full font-bold ${color}`}>{label}</span>;
+                                            })()}
                                             <span className="text-[11px] text-white/35">{zone.doors?.length || 0}</span>
                                             <svg viewBox="0 0 24 24" className={`w-4 h-4 opacity-35 transition-transform ${expandedSite === String(zone.id) ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />

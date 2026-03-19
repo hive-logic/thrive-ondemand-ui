@@ -141,3 +141,20 @@ export async function fetchQuickActionsData(customerId: string, accessToken: str
     return null;
   }
 }
+
+export async function fetchAccessZones(customerId: string, accessToken: string): Promise<{ access_zones: any[] } | null> {
+  try {
+    const url = `${API_BASE_URL}/v1/access_zones?customer_id=${encodeURIComponent(customerId)}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}

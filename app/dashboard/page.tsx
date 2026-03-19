@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 
 const AuthenticatedChatWindow = dynamic(
     () => import("@/components/AuthenticatedChatWindow"),
@@ -58,10 +59,15 @@ export default function DashboardPage() {
             {/* Header */}
             <header className="sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-black/20 border-b border-white/10 shrink-0">
                 <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-primary" />
-                        <span className="text-sm text-white/80">Thrive</span>
-                        <span className="text-xs text-white/40 px-2 py-0.5 rounded bg-white/5 ml-2">
+                    <div className="flex items-center gap-3">
+                        <Image
+                            src="/thrive_logo.png"
+                            alt="ThriveLogic"
+                            width={120}
+                            height={36}
+                            className="object-contain"
+                        />
+                        <span className="text-xs text-white/40 px-2 py-0.5 rounded bg-white/5">
                             Dashboard
                         </span>
                     </div>

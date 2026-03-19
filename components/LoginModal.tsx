@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useId } from "react";
+import Image from "next/image";
 import { useAuth } from "./AuthContext";
 
 interface LoginModalProps {
@@ -51,13 +52,14 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
         >
             <div className="card w-full max-w-md p-6 md:p-8 space-y-6 animate-in fade-in zoom-in-95 duration-200">
                 {/* Header */}
-                <div className="text-center space-y-2">
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                        <span className="h-2 w-2 rounded-full bg-primary" />
-                        <span className="text-sm text-white/80">Thrive</span>
-                    </div>
-                    <h2 className="text-xl md:text-2xl font-semibold text-white">Welcome back</h2>
-                    <p className="text-sm text-white/60">Sign in to access your dashboard</p>
+                <div className="flex items-center justify-center mb-6">
+                    <Image
+                        src="/thrive_logo.png"
+                        alt="ThriveLogic"
+                        width={140}
+                        height={42}
+                        className="object-contain"
+                    />
                 </div>
 
                 {/* Form */}
@@ -88,7 +90,7 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder="you@company.com"
+                                placeholder="you@thrivelogic.ai"
                                 autoComplete="email"
                                 autoFocus
                                 className="w-full rounded-xl bg-[#141415] border border-white/10 pl-11 pr-4 py-3 outline-none focus:ring-2 focus:ring-primary/40 caret-primary text-[16px] leading-6 appearance-none"

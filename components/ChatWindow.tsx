@@ -50,8 +50,8 @@ const MessageBubble = memo(
       >
         <div
           className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${isUser
-              ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
-              : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
+            ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
+            : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
             }`}
         >
           {isUser ? (
@@ -165,7 +165,18 @@ export default function ChatWindow() {
       return;
     }
     const firstName = session.name.split(" ")[0] || session.name;
-    const welcome = `Hey ${firstName}! I’m your on-site concierge. How can I help you today?`;
+    const welcome = `👋 **Hey ${firstName}!** I'm VARCA — your smart on-site assistant for this event.
+
+Here's what you can ask me:
+
+- 📍 **Event info** — schedule, location, what's happening
+- 🎤 **Speakers & sessions** — who's presenting and when
+- 🍽️ **Food, drinks & facilities** — where to find everything
+- 🚨 **Safety & emergencies** — who to contact, what to do
+- 💡 **Anything else** — I'm here to help!
+
+What's on your mind?`;
+
     setMessages([
       {
         id: "m1",

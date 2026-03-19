@@ -54,7 +54,7 @@ export default function WelcomeForm() {
   const [submitting, setSubmitting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [activityStatus, setActivityStatus] = useState<
-    ActivityStatus | "checking"
+    ActivityStatus | "checking" | "no_activity"
   >("checking");
   const [activityId, setActivityId] = useState<string | null>(null);
 
@@ -75,7 +75,7 @@ export default function WelcomeForm() {
 
         if (!act) {
           if (!cancelled) {
-            setActivityStatus("invalid");
+            setActivityStatus("no_activity");
           }
           return;
         }
@@ -226,17 +226,9 @@ export default function WelcomeForm() {
     router.replace(`/chat?activity=${encodeURIComponent(activityId)}`);
   }
 
-  if (activityStatus === "checking") {
-    return (
-      <div className="w-full max-w-xl mx-auto">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl md:text-3xl font-semibold">Welcome</h1>
-        </div>
-        <div className="card p-5 md:p-6 flex items-center justify-center text-white/70">
-          Checking event status…
-        </div>
-      </div>
-    );
+  // No activity param at all — plain homepage visit, show nothing (video/hero is enough)
+  if (activityStatus === "checking" || activityStatus === "no_activity") {
+    return null;
   }
 
   if (activityStatus === "not_active") {

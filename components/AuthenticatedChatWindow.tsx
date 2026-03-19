@@ -33,7 +33,7 @@ type MessageBubbleProps = {
 };
 
 // Directus backend URL for file downloads
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://app.dev.thrivelogic.ai";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://app.thrivelogic.ai";
 
 // Regex to match (document::UUID) pattern
 const DOCUMENT_REF_REGEX = /\(document::([a-f0-9-]{36})\)/gi;
@@ -144,11 +144,10 @@ const MessageBubble = memo(
         const isUser = props.msg.role === "user";
         return (
             <div className={`flex ${isUser ? "justify-end" : "justify-start"} ${props.isLast ? "message-in" : ""}`}>
-                <div className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${
-                    isUser
-                        ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
-                        : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
-                }`}>
+                <div className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${isUser
+                    ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
+                    : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
+                    }`}>
                     <div>
                         {isUser ? (
                             <p className="whitespace-pre-wrap">{props.msg.content}</p>
@@ -192,7 +191,7 @@ const TypingIndicator = memo(function TypingIndicator() {
 type SheetConfig = {
     title: string;
     icon: string;
-    sheetType: "standard" | "strobe" | "protocol" | "incident" | "direct";
+    sheetType: "standard" | "strobe" | "protocol" | "incident" | "direct" | "zone_doors";
     items: any[];
     allPayloadType?: string;
     allMessage?: string;
@@ -250,7 +249,16 @@ export default function AuthenticatedChatWindow() {
     useEffect(() => {
         if (!user) return;
         const firstName = user.first_name || user.email.split("@")[0];
-        setMessages([{ id: "m1", role: "assistant", content: `Hello ${firstName}! I'm your AI assistant. How can I help you today?` }]);
+        const welcome = `Hello ${firstName}! Here is what you can do:
+
+- View and manage **cameras**, **doors**, and **sensors**
+- Check **system health** across all connected devices
+- Access **SOPs** and **incident reports**
+- Lock or unlock doors, trigger audio/visual alerts
+- Ask me anything in plain language
+
+Use the quick buttons below to get started.`;
+        setMessages([{ id: "m1", role: "assistant", content: welcome }]);
     }, [user]);
 
     // Scroll to bottom on new messages
@@ -401,7 +409,7 @@ export default function AuthenticatedChatWindow() {
             <div className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-white/10">
                 <div className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${connected ? "bg-emerald-400" : "bg-red-400"}`} aria-label={connected ? "Connected" : "Disconnected"} />
-                    <div className="text-sm font-semibold">VARCA Assistant</div>
+                    <div className="text-sm font-semibold">VARCA</div>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                     <button type="button" onClick={() => { setActionsOpen((o) => !o); if (actionsOpen) closeSubmenu(); }}
@@ -434,65 +442,93 @@ export default function AuthenticatedChatWindow() {
 
                     {/* Actions group */}
                     <div className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-bold ml-1">Actions</div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                         <button type="button"
                             onClick={() => openSheet({ title: "Protocols", icon: "🛡️", sheetType: "protocol", items: quickActionsData.sites || [], allPayloadType: "protocols_all", allMessage: "Show me the emergency response protocols" })}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Protocols" ? "bg-gradient-to-r from-red-500/20 to-rose-500/10 border-red-500/40 text-red-100 shadow-[0_0_15px_-3px_rgba(239,68,68,0.2)]" : "border-red-500/20 bg-red-500/5 text-red-300 hover:bg-red-500/15 hover:border-red-500/30"}`}>
-                            🛡️ Protocols <span className="text-[10px] opacity-40">▶</span>
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Protocols" ? "bg-red-500/20 border-red-500/40 text-red-100" : "border-red-500/20 bg-red-500/5 text-red-300 hover:bg-red-500/15"}`}>
+                            <span className="text-lg">🛡️</span>
+                            <span>Protocols</span>
                         </button>
                         <button type="button"
                             onClick={() => openSheet({ title: "Flash Strobe", icon: "⚡", sheetType: "strobe", items: quickActionsData.notifiers_visual || [], allPayloadType: "notifier_visual_all", allMessage: "Flash all strobes" })}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Flash Strobe" ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border-yellow-500/40 text-yellow-100 shadow-[0_0_15px_-3px_rgba(234,179,8,0.2)]" : "border-yellow-500/20 bg-yellow-500/5 text-yellow-300 hover:bg-yellow-500/15 hover:border-yellow-500/30"}`}>
-                            ⚡ Flash Strobe <span className="text-[10px] opacity-40">▶</span>
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Flash Strobe" ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-100" : "border-yellow-500/20 bg-yellow-500/5 text-yellow-300 hover:bg-yellow-500/15"}`}>
+                            <span className="text-lg">⚡</span>
+                            <span>Flash Strobe</span>
                         </button>
                         <button type="button"
                             onClick={() => openSheet({ title: "Audio Alert", icon: "🔊", sheetType: "standard", items: quickActionsData.notifiers_audio || [], allPayloadType: "notifier_audio_all", allMessage: "Send audio alert to all speakers", itemPayloadType: "notifier_audio", itemLabelPrefix: "Play alert at" })}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Audio Alert" ? "bg-gradient-to-r from-orange-500/20 to-amber-500/10 border-orange-500/40 text-orange-100 shadow-[0_0_15px_-3px_rgba(249,115,22,0.2)]" : "border-orange-500/20 bg-orange-500/5 text-orange-300 hover:bg-orange-500/15 hover:border-orange-500/30"}`}>
-                            🔊 Audio Alert <span className="text-[10px] opacity-40">▶</span>
-                        </button>
-                        <button type="button"
-                            onClick={() => openSheet({ title: "Lock Doors", icon: "🔒", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_lock_all", allMessage: "Lock all doors", itemPayloadType: "door_lock", itemLabelPrefix: "Lock" })}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Lock Doors" ? "bg-gradient-to-r from-indigo-500/20 to-violet-500/10 border-indigo-500/40 text-indigo-100 shadow-[0_0_15px_-3px_rgba(99,102,241,0.2)]" : "border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500/15 hover:border-indigo-500/30"}`}>
-                            🔒 Lock Doors <span className="text-[10px] opacity-40">▶</span>
-                        </button>
-                        <button type="button"
-                            onClick={() => openSheet({ title: "Unlock Doors", icon: "🔓", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_unlock_all", allMessage: "Unlock all doors", itemPayloadType: "door_unlock", itemLabelPrefix: "Unlock" })}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Unlock Doors" ? "bg-gradient-to-r from-emerald-500/20 to-teal-500/10 border-emerald-500/40 text-emerald-100 shadow-[0_0_15px_-3px_rgba(16,185,129,0.2)]" : "border-emerald-500/20 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/15 hover:border-emerald-500/30"}`}>
-                            🔓 Unlock Doors <span className="text-[10px] opacity-40">▶</span>
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Audio Alert" ? "bg-orange-500/20 border-orange-500/40 text-orange-100" : "border-orange-500/20 bg-orange-500/5 text-orange-300 hover:bg-orange-500/15"}`}>
+                            <span className="text-lg">🔊</span>
+                            <span>Audio Alert</span>
                         </button>
                         <button type="button" onClick={() => sendAll("Send an email alert")}
-                            className="group inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/70 text-[12px] font-medium hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 active:scale-95">
-                            <span className="group-hover:scale-110 transition-transform duration-300">✉️</span> Email Alert
+                            className="flex flex-col items-center justify-center gap-1 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/60 text-[11px] font-medium hover:bg-white/[0.08] hover:text-white transition-all duration-300 active:scale-95">
+                            <span className="text-lg">✉️</span>
+                            <span>Email Alert</span>
+                        </button>
+                        {/* Zone-wide door commands */}
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Zone Lock", icon: "🔒", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_lock_all", allMessage: "Lock down all access zones", itemPayloadType: "door_lock", itemLabelPrefix: "Lock" })}
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Zone Lock" ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-100" : "border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500/15"}`}>
+                            <span className="text-lg">🔒</span>
+                            <span>Zone Lock</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Free Access", icon: "🔓", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_unlock_all", allMessage: "Enable free access on all access zones", itemPayloadType: "door_unlock", itemLabelPrefix: "Open" })}
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Free Access" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-100" : "border-emerald-500/20 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/15"}`}>
+                            <span className="text-lg">🔓</span>
+                            <span>Free Access</span>
+                        </button>
+                        <button type="button" onClick={() => sendAll("Return all access zones to normal secure operation", "zone_secure")}
+                            className="flex flex-col items-center justify-center gap-1 py-3 rounded-xl border border-teal-500/20 bg-teal-500/5 text-teal-300 text-[11px] font-medium hover:bg-teal-500/15 transition-all duration-300 active:scale-95">
+                            <span className="text-lg">🟢</span>
+                            <span>Secure Zone</span>
+                        </button>
+                        <button type="button" onClick={() => sendAll("Cancel lockdown on all access zones", "zone_cancel_lock_down")}
+                            className="flex flex-col items-center justify-center gap-1 py-3 rounded-xl border border-violet-500/20 bg-violet-500/5 text-violet-300 text-[11px] font-medium hover:bg-violet-500/15 transition-all duration-300 active:scale-95">
+                            <span className="text-lg">❌</span>
+                            <span>Cancel Lock</span>
                         </button>
                     </div>
 
                     {/* Quick Info group */}
                     <div className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-bold ml-1 mt-4">Quick Info</div>
-                    <div className="flex flex-wrap gap-2 pb-1">
+                    <div className="grid grid-cols-3 gap-2 pb-1">
                         <button type="button"
-                            onClick={() => openSheet({ title: "Camera Status", icon: "📹", sheetType: "standard", items: quickActionsData.cameras || [], allPayloadType: "camera_all", allMessage: "Show me all cameras and their statuses", itemPayloadType: "camera", itemLabelPrefix: "Status for camera" })}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Camera Status" ? "bg-gradient-to-r from-blue-500/20 to-sky-500/10 border-blue-500/40 text-blue-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"}`}>
-                            📹 Camera Status <span className="text-[10px] opacity-40">▶</span>
+                            onClick={() => sendAll("Show me the system health dashboard", "system_health_all")}
+                            className="flex flex-col items-center justify-center gap-1 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/70 text-[11px] font-medium hover:bg-white/[0.08] hover:text-white transition-all duration-300 active:scale-95">
+                            <span className="text-lg">🔧</span>
+                            <span>System Health</span>
                         </button>
                         <button type="button"
-                            onClick={() => openSheet({ title: "Door Status", icon: "🚪", sheetType: "standard", items: quickActionsData.doors || [], allPayloadType: "door_all", allMessage: "Show me all doors and their statuses", itemPayloadType: "door", itemLabelPrefix: "Status for door" })}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Door Status" ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/10 border-cyan-500/40 text-cyan-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"}`}>
-                            🚪 Door Status <span className="text-[10px] opacity-40">▶</span>
+                            onClick={() => openSheet({ title: "Camera Status", icon: "📹", sheetType: "standard", items: quickActionsData.cameras || [], allPayloadType: "camera_all", allMessage: "Show me all cameras and their statuses", itemPayloadType: "camera", itemLabelPrefix: "Status for camera" })}
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Camera Status" ? "bg-blue-500/20 border-blue-500/40 text-blue-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:text-white"}`}>
+                            <span className="text-lg">📹</span>
+                            <span>Cameras</span>
+                        </button>
+                        <button type="button"
+                            onClick={() => openSheet({ title: "Door Status", icon: "\uD83D\uDEAA", sheetType: "zone_doors", items: quickActionsData.access_zones || [], allPayloadType: "door_all", allMessage: "Show me all doors and their statuses" })}
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Door Status" ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:text-white"}`}>
+                            <span className="text-lg">🚪</span>
+                            <span>Doors</span>
                         </button>
                         <button type="button"
                             onClick={() => openSheet({ title: "SOPs", icon: "📖", sheetType: "standard", items: quickActionsData.documents || [], allPayloadType: "sop_all", allMessage: "Show me all available SOPs", itemPayloadType: "sop", itemLabelPrefix: "Show SOP" })}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "SOPs" ? "bg-gradient-to-r from-purple-500/20 to-fuchsia-500/10 border-purple-500/40 text-purple-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"}`}>
-                            📖 SOPs <span className="text-[10px] opacity-40">▶</span>
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "SOPs" ? "bg-purple-500/20 border-purple-500/40 text-purple-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:text-white"}`}>
+                            <span className="text-lg">📖</span>
+                            <span>SOPs</span>
                         </button>
                         <button type="button"
                             onClick={() => openSheet({ title: "Incident Reports", icon: "📋", sheetType: "incident", items: quickActionsData.incident_reports || [], allPayloadType: "incident_report_all", allMessage: "Show me all incident reports", itemPayloadType: "incident_report", itemLabelPrefix: "Show incident report" })}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Incident Reports" ? "bg-gradient-to-r from-rose-500/20 to-red-500/10 border-rose-500/40 text-rose-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"}`}>
-                            📋 Incident Reports <span className="text-[10px] opacity-40">▶</span>
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Incident Reports" ? "bg-rose-500/20 border-rose-500/40 text-rose-100" : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:text-white"}`}>
+                            <span className="text-lg">📋</span>
+                            <span>Incidents</span>
                         </button>
                         <button type="button"
                             onClick={() => sendQuickAction("Show me the recent alerts", JSON.stringify({ type: "recent_alerts_all", id: "", name: "" }))}
-                            className="group inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/70 text-[12px] font-medium hover:bg-white/[0.08] hover:border-white/20 hover:text-white transition-all duration-300 active:scale-95">
-                            <span className="group-hover:scale-110 transition-transform duration-300">🔔</span> Recent Alerts
+                            className="flex flex-col items-center justify-center gap-1 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/70 text-[11px] font-medium hover:bg-white/[0.08] hover:text-white transition-all duration-300 active:scale-95">
+                            <span className="text-lg">🔔</span>
+                            <span>Recent Alerts</span>
                         </button>
                     </div>
                 </div>
@@ -644,6 +680,45 @@ export default function AuthenticatedChatWindow() {
                                 </button>
                             ))}
 
+                            {/* Zone-Doors: zone accordion → individual doors */}
+                            {activeSheet.sheetType === "zone_doors" && activeSheet.items.map((zone: any) => (
+                                <div key={zone.id} className="border-b border-white/[0.05] last:border-0">
+                                    <button
+                                        onClick={() => setExpandedSite(prev => prev === String(zone.id) ? null : String(zone.id))}
+                                        className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${expandedSite === String(zone.id) ? "bg-white/5 text-white" : "text-white/80 hover:bg-white/[0.04]"}`}>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-white/30 text-base">🚪</span>
+                                            <span className="font-medium text-[14px]">{zone.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-white/35">{zone.doors?.length || 0}</span>
+                                            <svg viewBox="0 0 24 24" className={`w-4 h-4 opacity-35 transition-transform ${expandedSite === String(zone.id) ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
+                                            </svg>
+                                        </div>
+                                    </button>
+                                    {expandedSite === String(zone.id) && (
+                                        <div className="bg-black/20">
+                                            {(zone.doors || []).map((door: any) => (
+                                                <button key={door.id}
+                                                    onClick={() => { handleSubItemClick("door", door, "Status for door"); closeSubmenu(); }}
+                                                    className="w-full flex items-center justify-between pl-10 pr-5 py-3 text-left hover:bg-white/5 active:bg-white/10 border-b border-white/[0.04] last:border-0 transition-colors">
+                                                    <span className="text-[13px] text-white/85 truncate pr-3">{door.name}</span>
+                                                    {door.status && (
+                                                        <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${door.status === "connected" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
+                                                            {door.status === "connected" ? "online" : door.status}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                            {(!zone.doors || zone.doors.length === 0) && (
+                                                <div className="pl-10 pr-5 py-3 text-white/30 text-[12px]">No doors in this zone</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+
                             {/* Empty state */}
                             {activeSheet.items.length === 0 && activeSheet.sheetType !== "direct" && (
                                 <div className="px-5 py-10 text-center text-white/40 text-[13px]">
@@ -664,6 +739,29 @@ export default function AuthenticatedChatWindow() {
                     <MessageBubble key={m.id} msg={m} isLast={i === messages.length - 1} />
                 ))}
                 {sending && <TypingIndicator />}
+
+                {/* Quick chips — shown only when no conversation started yet */}
+                {messages.length === 1 && !sending && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                        {([
+                            { icon: "🔧", label: "System Health", action: () => sendAll("Show me the system health dashboard", "system_health_all") },
+                            { icon: "📹", label: "Camera Status", action: () => sendAll("Show me all cameras and their statuses", "camera_all") },
+                            { icon: "📋", label: "Incident Reports", action: () => sendAll("Show me all incident reports", "incident_report_all") },
+                            { icon: "🚨", label: "Recent Alerts", action: () => sendAll("Show me recent alerts", "recent_alerts_all") },
+                            { icon: "📝", label: "Create Incident", action: () => sendQuickAction("I need to create a new incident report") },
+                        ] as const).map((chip) => (
+                            <button
+                                key={chip.label}
+                                onClick={chip.action}
+                                disabled={!connected}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium bg-white/5 border border-white/10 text-white/75 hover:bg-white/10 hover:text-white hover:border-white/20 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                <span>{chip.icon}</span>
+                                <span>{chip.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Input */}

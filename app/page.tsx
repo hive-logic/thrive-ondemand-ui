@@ -31,8 +31,11 @@ export default function Page() {
       <div className="fixed inset-0 -z-10">
         <video
           autoPlay muted loop playsInline
-          className="absolute inset-0 w-full h-full object-cover"
+          preload="auto"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
           src="/video.mp4"
+          /* @ts-ignore */
+          webkit-playsinline="true"
         />
         {/* Dark base overlay */}
         <div className="absolute inset-0 bg-black/60" />

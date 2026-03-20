@@ -1541,8 +1541,8 @@ What's on your mind?`;
               }
             }}
             className={`h-12 md:h-12 inline-flex items-center justify-center gap-1.5 px-4 md:px-5 flex-shrink-0 touch-manipulation rounded-xl font-semibold text-sm transition-all duration-200 ${isListening
-                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
-                : 'btn-primary'
+              ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+              : 'btn-primary'
               }`}
             aria-label={isListening ? 'Stop listening' : 'Send'}
           >
@@ -1809,7 +1809,7 @@ What's on your mind?`;
                 style={{ pointerEvents: "none" }}
               >
                 <div
-                  className={`flex flex-col items-center justify-center gap-3 w-48 h-48 rounded-3xl border-2 ${borderColor} ${bgColor} ${glowColor} backdrop-blur-md animate-[expandIn_0.25s_ease-out_both]`}
+                  className={`flex flex-col items-center justify-center gap-3 w-48 h-56 rounded-3xl border-2 ${borderColor} ${bgColor} ${glowColor} backdrop-blur-md animate-[expandIn_0.25s_ease-out_both]`}
                   style={{ pointerEvents: "auto" }}
                   onTouchEnd={handleCatClear}
                   onTouchCancel={handleCatClear}
@@ -1822,8 +1822,9 @@ What's on your mind?`;
                   <span className="text-5xl font-bold text-white tabular-nums animate-pulse">
                     {sosCatCountdown}
                   </span>
+                  <span className="text-[10px] text-white/50 font-medium uppercase tracking-wider">Keep holding…</span>
+                  <span className="text-[9px] text-white/30 -mt-2">Release to cancel</span>
                 </div>
-                <p className="mt-4 text-white/70 text-sm font-medium animate-pulse">Keep holding…</p>
               </div>
             );
           })()}

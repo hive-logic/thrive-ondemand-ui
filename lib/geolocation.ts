@@ -50,7 +50,7 @@ async function reverseGeocode(coords: Coordinates, email?: string): Promise<stri
       lat: String(coords.latitude),
       lon: String(coords.longitude),
       'accept-language': 'en',
-      zoom: '14'
+      zoom: '18'
     });
     if (email) params.set('email', email);
     const url = `https://nominatim.openstreetmap.org/reverse?${params.toString()}`;

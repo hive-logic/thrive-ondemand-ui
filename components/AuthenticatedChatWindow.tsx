@@ -955,24 +955,15 @@ Use the quick buttons below to get started.`;
 
                 {/* Quick chips — shown only when no conversation started yet */}
                 {messages.length === 1 && !sending && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                        {([
-                            { icon: "🔧", label: "System Health", action: () => sendAll("Show me the system health dashboard", "system_health_all") },
-                            { icon: "📹", label: "Camera Status", action: () => sendAll("Show me all cameras and their statuses", "camera_all") },
-                            { icon: "📋", label: "Incident Reports", action: () => sendAll("Show me all incident reports", "incident_report_all") },
-                            { icon: "🚨", label: "Recent Alerts", action: () => sendAll("Show me recent alerts", "recent_alerts_all") },
-                            { icon: "📝", label: "Create Incident", action: () => sendQuickAction("I need to create a new incident report") },
-                        ] as const).map((chip) => (
-                            <button
-                                key={chip.label}
-                                onClick={chip.action}
-                                disabled={!connected}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium bg-white/5 border border-white/10 text-white/75 hover:bg-white/10 hover:text-white hover:border-white/20 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                <span>{chip.icon}</span>
-                                <span>{chip.label}</span>
-                            </button>
-                        ))}
+                    <div className="pt-2 w-full">
+                        <button
+                            onClick={() => sendQuickAction("I need to create a new incident report")}
+                            disabled={!connected}
+                            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-[13px] font-semibold bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 text-white/90 hover:from-primary/30 hover:to-accent/30 hover:text-white active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            <span className="text-base">📝</span>
+                            <span>Create Incident Report</span>
+                        </button>
                     </div>
                 )}
             </div>

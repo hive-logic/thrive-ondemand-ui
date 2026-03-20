@@ -15,6 +15,8 @@ let authSocket: WebSocket | null = null;
 let retries = 0;
 let cachedClientId: string | null = null;
 let pingIntervalId: ReturnType<typeof setInterval> | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let isReconnecting = false; // Prevent simultaneous reconnect attempts
 
 // Ping interval in ms - 20 seconds (most load balancers have 30-60s timeout)
 const PING_INTERVAL = 20000;
@@ -121,9 +123,17 @@ function getAuthWsUrl(): string {
 }
 
 function connectAuth(): WebSocket {
+    // If already connecting or open, return existing socket
     if (authSocket && authSocket.readyState !== WebSocket.CLOSED) {
         return authSocket;
     }
+
+    // Prevent simultaneous connect calls (race condition guard)
+    if (isReconnecting) return authSocket!;
+    isReconnecting = true;
+
+    // Cancel any pending retry timer — this call supersedes it
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
 
     // Stop any existing ping interval
     stopPing();
@@ -136,6 +146,7 @@ function connectAuth(): WebSocket {
 
         authSocket.addEventListener("open", () => {
             retries = 0;
+            isReconnecting = false;
             // eslint-disable-next-line no-console
             console.log("Auth WS connected with clientId:", getAuthClientId());
             subscribers.forEach((s) => s.onOpen?.());
@@ -144,6 +155,7 @@ function connectAuth(): WebSocket {
         });
 
         authSocket.addEventListener("close", (ev: CloseEvent) => {
+            isReconnecting = false;
             // Stop ping on close
             stopPing();
             // eslint-disable-next-line no-console
@@ -160,12 +172,14 @@ function connectAuth(): WebSocket {
             // eslint-disable-next-line no-console
             console.error("Auth WS error:", err);
             subscribers.forEach((s) => s.onError?.(err));
+            // Don't set isReconnecting=false here — close event will follow
         });
 
         authSocket.addEventListener("message", (ev) => {
             subscribers.forEach((s) => s.onMessage?.(ev));
         });
     } catch {
+        isReconnecting = false;
         retryAuthConnect();
     }
 
@@ -181,9 +195,8 @@ function startPing(): void {
     pingIntervalId = setInterval(() => {
         if (authSocket && authSocket.readyState === WebSocket.OPEN) {
             try {
-                // Send a minimal ping — just an empty JSON object
-                // The backend should see no "message" field and skip processing
-                authSocket.send("ping");
+                // Send JSON ping — raw strings can cause parse errors on backend
+                authSocket.send(JSON.stringify({ type: "ping" }));
             } catch {
                 // ignore errors during ping
             }
@@ -201,11 +214,9 @@ function stopPing(): void {
     }
 }
 
-let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
 function retryAuthConnect() {
-    // Clear any pending retry
-    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    // Don't schedule another retry if one is already pending
+    if (retryTimer) return;
 
     // Exponential backoff: 1s, 2s, 4s, 8s, 15s, 30s, 30s, 30s…
     const backoff = Math.min(1000 * Math.pow(2, retries), 30000);
@@ -215,18 +226,39 @@ function retryAuthConnect() {
 
     // eslint-disable-next-line no-console
     console.log(`Auth WS retry #${retries} in ${Math.round(jitter)}ms`);
-    retryTimer = setTimeout(connectAuth, jitter);
+    retryTimer = setTimeout(() => {
+        retryTimer = null;
+        connectAuth();
+    }, jitter);
 }
 
 // Reconnect when user returns to the tab (phone wake, tab switch)
 if (typeof document !== "undefined") {
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
-            // If socket is dead, reconnect immediately
-            if (!authSocket || authSocket.readyState === WebSocket.CLOSED) {
-                retries = 0; // Reset backoff on manual return
+            const isDead = !authSocket ||
+                authSocket.readyState === WebSocket.CLOSED ||
+                authSocket.readyState === WebSocket.CLOSING;
+            if (isDead) {
+                // Cancel pending backoff — reconnect immediately on return
+                if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+                retries = 0;
+                isReconnecting = false; // Reset guard in case it got stuck
                 connectAuth();
             }
+        }
+    });
+
+    // Also reconnect when browser comes back online (WiFi/4G switch)
+    window.addEventListener("online", () => {
+        const isDead = !authSocket ||
+            authSocket.readyState === WebSocket.CLOSED ||
+            authSocket.readyState === WebSocket.CLOSING;
+        if (isDead) {
+            if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+            retries = 0;
+            isReconnecting = false;
+            connectAuth();
         }
     });
 }

@@ -1,6 +1,8 @@
 let socket: WebSocket | null = null;
 let retries = 0;
 let cachedClientId: string | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let isReconnecting = false;
 type Subscriber = {
   onOpen?: () => void;
   onClose?: (ev: CloseEvent) => void;
@@ -25,6 +27,13 @@ function connect(): WebSocket {
   if (socket && socket.readyState !== WebSocket.CLOSED) {
     return socket;
   }
+  // Prevent simultaneous connect calls
+  if (isReconnecting) return socket!;
+  isReconnecting = true;
+
+  // Cancel any pending retry — this call supersedes it
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+
   try {
     const url = getUrl();
     // eslint-disable-next-line no-console
@@ -32,12 +41,13 @@ function connect(): WebSocket {
     socket = new WebSocket(url);
     socket.addEventListener("open", () => {
       retries = 0;
+      isReconnecting = false;
       // eslint-disable-next-line no-console
       console.log("WS connected with clientId:", getClientId());
-      // Notify subscribers
       subscribers.forEach((s) => s.onOpen?.());
     });
     socket.addEventListener("close", (ev: CloseEvent) => {
+      isReconnecting = false;
       // eslint-disable-next-line no-console
       console.log("WS disconnected", {
         code: ev.code,
@@ -52,12 +62,13 @@ function connect(): WebSocket {
       // eslint-disable-next-line no-console
       console.error("WS error event:", err);
       subscribers.forEach((s) => s.onError?.(err));
-      // allow onclose to schedule retry
+      // Don't set isReconnecting=false here — close event will follow
     });
     socket.addEventListener("message", (ev) => {
       subscribers.forEach((s) => s.onMessage?.(ev));
     });
   } catch {
+    isReconnecting = false;
     retryConnect();
   }
   return socket!;
@@ -88,11 +99,9 @@ function getClientId(): string {
   }
 }
 
-let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
 function retryConnect() {
-  // Clear any pending retry
-  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+  // Don't schedule another retry if one is already pending
+  if (retryTimer) return;
 
   // Exponential backoff: 1s, 2s, 4s, 8s, 15s, 30s, 30s…
   const backoff = Math.min(1000 * Math.pow(2, retries), 30000);
@@ -102,17 +111,39 @@ function retryConnect() {
 
   // eslint-disable-next-line no-console
   console.log(`WS retry #${retries} in ${Math.round(jitter)}ms`);
-  retryTimer = setTimeout(connect, jitter);
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    connect();
+  }, jitter);
 }
 
 // Reconnect when user returns to the tab (phone wake, tab switch)
 if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      if (!socket || socket.readyState === WebSocket.CLOSED) {
+      const isDead = !socket ||
+        socket.readyState === WebSocket.CLOSED ||
+        socket.readyState === WebSocket.CLOSING;
+      if (isDead) {
+        // Cancel pending backoff — reconnect immediately on return
+        if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
         retries = 0;
+        isReconnecting = false;
         connect();
       }
+    }
+  });
+
+  // Also reconnect when browser comes back online (WiFi/4G switch)
+  window.addEventListener("online", () => {
+    const isDead = !socket ||
+      socket.readyState === WebSocket.CLOSED ||
+      socket.readyState === WebSocket.CLOSING;
+    if (isDead) {
+      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+      retries = 0;
+      isReconnecting = false;
+      connect();
     }
   });
 }

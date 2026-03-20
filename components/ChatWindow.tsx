@@ -1748,12 +1748,6 @@ What's on your mind?`;
                     : cat.color === "orange"
                       ? "border-orange-500/40"
                       : "border-yellow-500/40";
-                const bgActive =
-                  cat.color === "red"
-                    ? "bg-red-500/30"
-                    : cat.color === "orange"
-                      ? "bg-orange-500/30"
-                      : "bg-yellow-500/30";
                 const bgIdle =
                   cat.color === "red"
                     ? "bg-red-500/10"
@@ -1770,29 +1764,68 @@ What's on your mind?`;
                     onMouseUp={handleCatClear}
                     onMouseLeave={handleCatClear}
                     onContextMenu={(e) => e.preventDefault()}
-                    className={`relative flex flex-col items-center justify-center gap-1.5 py-5 rounded-2xl border text-center font-medium transition-all duration-300 active:scale-95 touch-manipulation ${isActive
-                        ? `${bgActive} ${borderColor} scale-[1.03]`
-                        : `${bgIdle} ${borderColor} hover:scale-[1.02]`
-                      }`}
-                    style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+                    className={`relative flex flex-col items-center justify-center gap-1.5 py-5 rounded-2xl border text-center font-medium transition-all duration-300 touch-manipulation ${bgIdle} ${borderColor} hover:scale-[1.02]`}
+                    style={{
+                      WebkitTouchCallout: "none",
+                      WebkitUserSelect: "none",
+                      visibility: isActive ? "hidden" : "visible",
+                    }}
                   >
                     <span className="text-3xl">{cat.icon}</span>
                     <span className="text-[11px] text-white/90 leading-tight">
                       {cat.label}
                     </span>
-                    {/* Countdown overlay */}
-                    {isActive && sosCatCountdown !== null && (
-                      <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/60 backdrop-blur-sm">
-                        <span className="text-4xl font-bold text-white tabular-nums animate-pulse">
-                          {sosCatCountdown}
-                        </span>
-                      </div>
-                    )}
                   </button>
                 );
               })}
             </div>
           </div>
+
+          {/* Expanded active button overlay — centered on screen */}
+          {activeSosCat && sosCatCountdown !== null && (() => {
+            const cat = SOS_CATEGORIES.find((c) => c.key === activeSosCat);
+            if (!cat) return null;
+            const borderColor =
+              cat.color === "red"
+                ? "border-red-500"
+                : cat.color === "orange"
+                  ? "border-orange-500"
+                  : "border-yellow-500";
+            const bgColor =
+              cat.color === "red"
+                ? "bg-red-500/30"
+                : cat.color === "orange"
+                  ? "bg-orange-500/30"
+                  : "bg-yellow-500/30";
+            const glowColor =
+              cat.color === "red"
+                ? "shadow-[0_0_60px_rgba(239,68,68,0.4)]"
+                : cat.color === "orange"
+                  ? "shadow-[0_0_60px_rgba(249,115,22,0.4)]"
+                  : "shadow-[0_0_60px_rgba(234,179,8,0.4)]";
+            return (
+              <div
+                className="fixed inset-0 z-[70] flex items-center justify-center"
+                style={{ pointerEvents: "none" }}
+              >
+                <div
+                  className={`flex flex-col items-center justify-center gap-3 w-48 h-48 rounded-3xl border-2 ${borderColor} ${bgColor} ${glowColor} backdrop-blur-md animate-[expandIn_0.25s_ease-out_both]`}
+                  style={{ pointerEvents: "auto" }}
+                  onTouchEnd={handleCatClear}
+                  onTouchCancel={handleCatClear}
+                  onMouseUp={handleCatClear}
+                >
+                  <span className="text-5xl">{cat.icon}</span>
+                  <span className="text-sm text-white/90 font-medium">
+                    {cat.label}
+                  </span>
+                  <span className="text-5xl font-bold text-white tabular-nums animate-pulse">
+                    {sosCatCountdown}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Footer hint */}
           <div className="px-5 pb-safe mb-4 text-center">

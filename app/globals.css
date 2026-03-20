@@ -142,5 +142,8 @@ html.keyboard-open .pb-safe {
   touch-action: manipulation;
 }
 
-
-
+/* SOS button expand-to-center animation */
+@keyframes expandIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}

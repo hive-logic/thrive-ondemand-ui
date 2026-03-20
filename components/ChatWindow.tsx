@@ -1033,7 +1033,9 @@ What's on your mind?`;
           onMouseDown={handleSOSStart}
           onMouseUp={handleSOSClear}
           onMouseLeave={handleSOSClear}
+          onContextMenu={(e) => e.preventDefault()}
           className="ml-auto px-3 py-1.5 text-xs font-bold rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors border border-red-500/50 select-none touch-manipulation"
+          style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
           title="Hold for 5 seconds to send SOS"
           aria-label="SOS — hold for 5 seconds"
         >
@@ -1395,8 +1397,11 @@ What's on your mind?`;
       )}
       {/* SOS countdown overlay */}
       {sosCountdown !== null && (
-        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="relative flex items-center justify-center">
+        <div
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm select-none"
+          style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+          onContextMenu={(e) => e.preventDefault()}
+        >          <div className="relative flex items-center justify-center">
             {/* Pulsing ring */}
             <div
               className="absolute rounded-full border-4 border-red-500 animate-ping"

@@ -1120,12 +1120,10 @@ Use the quick buttons below to get started.`;
                         {/* Header */}
                         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]">
                             <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="text-xl">
-                                    {selectedAlert.protocol_type === 'fire' ? '🔥' :
-                                        selectedAlert.protocol_type === 'active_shooter' ? '🔫' :
-                                            selectedAlert.protocol_type === 'bomb_threat' ? '💣' :
-                                                selectedAlert.protocol_type === 'medical' ? '🏥' : '⚠️'}
-                                </span>
+                                {/* Only show icon for notification alerts — event alerts already have icon in title */}
+                                {selectedAlert.source === 'notification' && (
+                                    <span className="text-xl">⚠️</span>
+                                )}
                                 <h3 className="text-[15px] font-semibold text-white truncate">{selectedAlert.title}</h3>
                             </div>
                             <button onClick={() => setSelectedAlert(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/50 transition-colors flex-shrink-0">
@@ -1221,9 +1219,12 @@ Use the quick buttons below to get started.`;
                                     {selectedAlert.reporter_name && (
                                         <div>
                                             <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Reported by</div>
-                                            <div className="text-[13px] text-white/80 flex items-center gap-1.5">
-                                                <span>👤</span> {selectedAlert.reporter_name}
-                                                {selectedAlert.reporter_email && <span className="text-white/40 text-[11px]">({selectedAlert.reporter_email})</span>}
+                                            <div className="text-[13px] text-white/80 flex items-start gap-1.5">
+                                                <span className="mt-0.5">👤</span>
+                                                <div>
+                                                    <div>{selectedAlert.reporter_name}</div>
+                                                    {selectedAlert.reporter_email && <div className="text-white/40 text-[11px] mt-0.5 break-all">{selectedAlert.reporter_email}</div>}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -1238,33 +1239,33 @@ Use the quick buttons below to get started.`;
                         </div>
 
                         {/* Actions */}
-                        <div className="px-5 py-4 border-t border-white/[0.08] flex gap-3">
-                            <button
-                                onClick={() => {
-                                    dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
-                                    setSelectedAlert(null);
-                                }}
-                                className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-[0.98]"
-                            >
-                                Dismiss
-                            </button>
-                            {/* Ask Varca — for all alert types */}
-                            <button
-                                onClick={() => {
-                                    const title = selectedAlert.title || 'Alert';
-                                    const loc = selectedAlert.location ? ` at ${selectedAlert.location}` : '';
-                                    const time = selectedAlert.date_created ? ` on ${new Date(selectedAlert.date_created).toLocaleString()}` : '';
-                                    const desc = selectedAlert.description ? ` — ${selectedAlert.description}` : '';
-                                    // Human-readable message shown in chat
-                                    const userMsg = `🔔 Alert: ${title}${loc}${time}.${desc} What should I know about this alert?`;
-                                    sendAll(userMsg);
-                                    dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
-                                    setSelectedAlert(null);
-                                }}
-                                className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-primary/20 border border-primary/30 text-primary hover:bg-primary/30 transition-all active:scale-[0.98]"
-                            >
-                                💬 Ask Varca
-                            </button>
+                        <div className="px-5 py-4 border-t border-white/[0.08] space-y-3">
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
+                                        setSelectedAlert(null);
+                                    }}
+                                    className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-[0.98]"
+                                >
+                                    Dismiss
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const title = selectedAlert.title || 'Alert';
+                                        const loc = selectedAlert.location ? ` at ${selectedAlert.location}` : '';
+                                        const time = selectedAlert.date_created ? ` on ${new Date(selectedAlert.date_created).toLocaleString()}` : '';
+                                        const desc = selectedAlert.description ? ` — ${selectedAlert.description}` : '';
+                                        const userMsg = `🔔 Alert: ${title}${loc}${time}.${desc} What should I know about this alert?`;
+                                        sendAll(userMsg);
+                                        dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
+                                        setSelectedAlert(null);
+                                    }}
+                                    className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-primary/20 border border-primary/30 text-primary hover:bg-primary/30 transition-all active:scale-[0.98]"
+                                >
+                                    💬 Ask Varca
+                                </button>
+                            </div>
                             {selectedAlert.protocol_type && (
                                 <button
                                     onClick={() => {
@@ -1275,9 +1276,9 @@ Use the quick buttons below to get started.`;
                                         dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
                                         setSelectedAlert(null);
                                     }}
-                                    className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all active:scale-[0.98]"
+                                    className="w-full py-3 rounded-xl text-[13px] font-semibold bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all active:scale-[0.98]"
                                 >
-                                    ⚠️ {selectedAlert.protocol_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — Activate
+                                    ⚠️ {selectedAlert.protocol_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — Activate Protocol
                                 </button>
                             )}
                         </div>

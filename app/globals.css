@@ -12,6 +12,15 @@ html, body {
   overflow: hidden; /* lock page-level scroll; only inner containers can scroll */
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Allow text selection only in input fields */
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 body {

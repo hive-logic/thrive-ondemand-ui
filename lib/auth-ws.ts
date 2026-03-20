@@ -201,10 +201,34 @@ function stopPing(): void {
     }
 }
 
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
 function retryAuthConnect() {
-    if (retries > 6) return;
-    const backoff = Math.min(1000 * Math.pow(2, retries++), 8000);
-    setTimeout(connectAuth, backoff);
+    // Clear any pending retry
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, 15s, 30s, 30s, 30s…
+    const backoff = Math.min(1000 * Math.pow(2, retries), 30000);
+    // Add jitter (±25%) to prevent thundering herd
+    const jitter = backoff * (0.75 + Math.random() * 0.5);
+    retries++;
+
+    // eslint-disable-next-line no-console
+    console.log(`Auth WS retry #${retries} in ${Math.round(jitter)}ms`);
+    retryTimer = setTimeout(connectAuth, jitter);
+}
+
+// Reconnect when user returns to the tab (phone wake, tab switch)
+if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            // If socket is dead, reconnect immediately
+            if (!authSocket || authSocket.readyState === WebSocket.CLOSED) {
+                retries = 0; // Reset backoff on manual return
+                connectAuth();
+            }
+        }
+    });
 }
 
 export function getAuthWS(): WebSocket {
@@ -231,6 +255,9 @@ export function subscribeAuthWS(sub: Subscriber): () => void {
 }
 
 export function disconnectAuthWS(): void {
+    // Clear any pending retry
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    stopPing();
     if (authSocket) {
         try {
             authSocket.close();

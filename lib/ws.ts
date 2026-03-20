@@ -88,10 +88,33 @@ function getClientId(): string {
   }
 }
 
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
 function retryConnect() {
-  if (retries > 6) return;
-  const backoff = Math.min(1000 * Math.pow(2, retries++), 8000);
-  setTimeout(connect, backoff);
+  // Clear any pending retry
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+
+  // Exponential backoff: 1s, 2s, 4s, 8s, 15s, 30s, 30s…
+  const backoff = Math.min(1000 * Math.pow(2, retries), 30000);
+  // Add jitter (±25%) to prevent thundering herd
+  const jitter = backoff * (0.75 + Math.random() * 0.5);
+  retries++;
+
+  // eslint-disable-next-line no-console
+  console.log(`WS retry #${retries} in ${Math.round(jitter)}ms`);
+  retryTimer = setTimeout(connect, jitter);
+}
+
+// Reconnect when user returns to the tab (phone wake, tab switch)
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      if (!socket || socket.readyState === WebSocket.CLOSED) {
+        retries = 0;
+        connect();
+      }
+    }
+  });
 }
 
 export function getWS(): WebSocket {

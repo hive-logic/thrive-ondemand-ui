@@ -114,14 +114,14 @@ export default function Page() {
                   Logout
                 </button>
               </div>
-            ) : hasActivity ? (
+            ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
                 className="text-sm px-4 py-1.5 rounded-lg border border-white/20 text-white/70 hover:text-white hover:border-white/40 hover:bg-white/5 transition-colors"
               >
                 Login
               </button>
-            ) : null}
+            )}
           </div>
         </div>
       </header>

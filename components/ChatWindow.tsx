@@ -162,9 +162,13 @@ export default function ChatWindow() {
 
   // ── Speech-to-Text state ──
   const [isListening, setIsListening] = useState(false);
+  const isListeningRef = useRef(false);
   const recognitionRef = useRef<any>(null);
   const sendLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendWasLongPress = useRef(false);
+
+  // Keep ref in sync with state
+  useEffect(() => { isListeningRef.current = isListening; }, [isListening]);
 
   const SOS_CATEGORIES = [
     { key: "fire", icon: "🔥", label: "Fire", color: "red" },
@@ -1042,10 +1046,8 @@ What's on your mind?`;
 
     recognition.onend = () => {
       // If still in listening mode, restart (keeps listening until user stops)
-      if (isListening) {
+      if (isListeningRef.current) {
         try { recognition.start(); } catch {}
-      } else {
-        setIsListening(false);
       }
     };
 

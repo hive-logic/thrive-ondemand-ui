@@ -259,9 +259,13 @@ export default function AuthenticatedChatWindow() {
 
     // ── Speech-to-Text state ──
     const [isListening, setIsListening] = useState(false);
+    const isListeningRef = useRef(false);
     const recognitionRef = useRef<any>(null);
     const sendLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const sendWasLongPress = useRef(false);
+
+    // Keep ref in sync with state
+    useEffect(() => { isListeningRef.current = isListening; }, [isListening]);
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const streamMsgIdRef = useRef<string | null>(null);
@@ -916,7 +920,7 @@ Use the quick buttons below to get started.`;
                                         setInput(ft + (interim ? ' ' + interim : ''));
                                     };
                                     rec.onerror = (ev: any) => { if (ev.error !== 'no-speech') setIsListening(false); };
-                                    rec.onend = () => { setIsListening(false); };
+                                    rec.onend = () => { if (isListeningRef.current) { try { rec.start(); } catch {} } };
                                     recognitionRef.current = rec;
                                     try { rec.start(); setIsListening(true); } catch {}
                                 }

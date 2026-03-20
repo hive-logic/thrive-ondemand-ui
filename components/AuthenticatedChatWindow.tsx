@@ -3,6 +3,7 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { fetchQuickActionsData, fetchAccessZones, fetchLiveAlerts, fetchLastNotification, markAlertSeen, LiveAlert } from "@/lib/backend-api";
+import { requestUserLocation } from "@/lib/geolocation";
 import {
     getAuthWS,
     isAuthWSOpen,
@@ -287,14 +288,14 @@ export default function AuthenticatedChatWindow() {
         // Persist to localStorage
         try {
             localStorage.setItem('dismissedAlertIds', JSON.stringify([...seenAlertIds.current]));
-        } catch {}
+        } catch { }
         // Remove from local list
         setLiveAlerts((prev) => prev.filter((a) => a.id !== alertId));
         // Mark seen on backend if notification_id is available
         if (notificationId && user?.id && user?.customer?.id) {
             const token = getStoredAccessToken();
             if (token) {
-                markAlertSeen(notificationId, user.id, user.customer.id, token).catch(() => {});
+                markAlertSeen(notificationId, user.id, user.customer.id, token).catch(() => { });
             }
         }
     }, [user]);
@@ -568,8 +569,14 @@ Use the quick buttons below to get started.`;
         setMessages((m) => [...m, userMsg]);
         const ws = getAuthWS();
         const userMeta = getAuthUserMeta();
-        const payload = { user_uuid: userMeta?.id, message: text, time: new Date().toISOString(), user_meta: userMeta, session_id: getOrCreateSessionId() };
-        // console.log("Auth WS sending:", payload);
+        // Refresh GPS location (3s timeout, non-blocking on failure)
+        let locationData: { latitude: number; longitude: number } | undefined;
+        try {
+            const coords = await requestUserLocation(3000);
+            if (coords) locationData = { latitude: coords.latitude, longitude: coords.longitude };
+        } catch { /* GPS unavailable — proceed without */ }
+        const enrichedMeta = locationData ? { ...userMeta, location: locationData } : userMeta;
+        const payload = { user_uuid: userMeta?.id, message: text, time: new Date().toISOString(), user_meta: enrichedMeta, session_id: getOrCreateSessionId() };
         if (ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(payload)); setSending(true); }
     }
 
@@ -634,11 +641,10 @@ Use the quick buttons below to get started.`;
                                         setAlertsOpen(false);
                                     }}
                                 >
-                                    <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm ${
-                                        alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                        alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                        'bg-amber-500/20 text-amber-400'
-                                    }`}>
+                                    <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm ${alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                            alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                                'bg-amber-500/20 text-amber-400'
+                                        }`}>
                                         ⚠️
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -646,11 +652,10 @@ Use the quick buttons below to get started.`;
                                         {alert.description && <div className="text-[11px] text-white/50 mt-0.5 line-clamp-2">{alert.description}</div>}
                                         <div className="flex items-center gap-2 mt-1">
                                             {alert.severity && (
-                                                <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                                                    alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                                    alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                                    'bg-yellow-500/20 text-yellow-400'
-                                                }`}>{alert.severity}</span>
+                                                <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                                        alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                                            'bg-yellow-500/20 text-yellow-400'
+                                                    }`}>{alert.severity}</span>
                                             )}
                                             {alert.protocol_type && (
                                                 <span className="text-[10px] text-white/40">{alert.protocol_type.replace(/_/g, ' ')}</span>
@@ -1035,7 +1040,7 @@ Use the quick buttons below to get started.`;
                     <input
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Ask me anything…"
+                        placeholder="What's happening?"
                         className="flex-1 min-w-0 h-12 rounded-xl bg-[#141415] border border-white/10 px-4 py-0 outline-none appearance-none placeholder:text-white/60 text-[16px] leading-6 focus:ring-2 focus:ring-primary/30 touch-manipulation"
                         aria-label="Message"
                     />
@@ -1048,11 +1053,11 @@ Use the quick buttons below to get started.`;
                                 sendWasLongPress.current = true;
                                 if (isListening) {
                                     setIsListening(false);
-                                    if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch {} recognitionRef.current = null; }
+                                    if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch { } recognitionRef.current = null; }
                                 } else {
                                     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
                                     if (!SR) return;
-                                    if (recognitionRef.current) { try { recognitionRef.current.abort(); } catch {} }
+                                    if (recognitionRef.current) { try { recognitionRef.current.abort(); } catch { } }
                                     const rec = new SR();
                                     rec.lang = 'en-US'; rec.continuous = true; rec.interimResults = true;
                                     let ft = input;
@@ -1065,9 +1070,9 @@ Use the quick buttons below to get started.`;
                                         setInput(ft + (interim ? ' ' + interim : ''));
                                     };
                                     rec.onerror = (ev: any) => { if (ev.error !== 'no-speech') setIsListening(false); };
-                                    rec.onend = () => { if (isListeningRef.current) { try { rec.start(); } catch {} } };
+                                    rec.onend = () => { if (isListeningRef.current) { try { rec.start(); } catch { } } };
                                     recognitionRef.current = rec;
-                                    try { rec.start(); setIsListening(true); } catch {}
+                                    try { rec.start(); setIsListening(true); } catch { }
                                 }
                             }, 800);
                         }}
@@ -1079,27 +1084,26 @@ Use the quick buttons below to get started.`;
                             }
                             if (isListening) {
                                 setIsListening(false);
-                                if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch {} recognitionRef.current = null; }
+                                if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch { } recognitionRef.current = null; }
                                 return;
                             }
                             if (connected && input.trim() && !sending) {
                                 handleSend(e as unknown as React.FormEvent);
                             }
                         }}
-                        className={`h-12 inline-flex items-center justify-center gap-1.5 px-4 md:px-5 flex-shrink-0 touch-manipulation rounded-xl font-semibold text-sm transition-all duration-200 ${
-                            isListening ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'btn-primary'
-                        }`}
+                        className={`h-12 inline-flex items-center justify-center gap-1.5 px-4 md:px-5 flex-shrink-0 touch-manipulation rounded-xl font-semibold text-sm transition-all duration-200 ${isListening ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'btn-primary'
+                            }`}
                         aria-label={isListening ? 'Stop listening' : 'Send'}>
                         {isListening ? (
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="animate-[pulse_1s_ease-in-out_infinite]">
-                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                             </svg>
                         ) : (
                             <>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="opacity-50">
-                                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                                 </svg>
                                 Send
                             </>
@@ -1111,16 +1115,16 @@ Use the quick buttons below to get started.`;
             {/* ── Event Alert Detail Popup ── */}
             {selectedAlert && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
-                     onClick={(e) => { if (e.target === e.currentTarget) { setSelectedAlert(null); } }}>
+                    onClick={(e) => { if (e.target === e.currentTarget) { setSelectedAlert(null); } }}>
                     <div className="w-full max-w-md bg-[#1c1d20] rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
                         {/* Header */}
                         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]">
                             <div className="flex items-center gap-2.5 min-w-0">
                                 <span className="text-xl">
                                     {selectedAlert.protocol_type === 'fire' ? '🔥' :
-                                     selectedAlert.protocol_type === 'active_shooter' ? '🔫' :
-                                     selectedAlert.protocol_type === 'bomb_threat' ? '💣' :
-                                     selectedAlert.protocol_type === 'medical' ? '🏥' : '⚠️'}
+                                        selectedAlert.protocol_type === 'active_shooter' ? '🔫' :
+                                            selectedAlert.protocol_type === 'bomb_threat' ? '💣' :
+                                                selectedAlert.protocol_type === 'medical' ? '🏥' : '⚠️'}
                                 </span>
                                 <h3 className="text-[15px] font-semibold text-white truncate">{selectedAlert.title}</h3>
                             </div>
@@ -1133,11 +1137,10 @@ Use the quick buttons below to get started.`;
                         <div className="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
                             {/* Severity badge */}
                             {selectedAlert.severity && (
-                                <span className={`inline-block text-[10px] uppercase font-bold px-2.5 py-1 rounded-md ${
-                                    selectedAlert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                    selectedAlert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                    'bg-yellow-500/20 text-yellow-400'
-                                }`}>{selectedAlert.severity}</span>
+                                <span className={`inline-block text-[10px] uppercase font-bold px-2.5 py-1 rounded-md ${selectedAlert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                        selectedAlert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                            'bg-yellow-500/20 text-yellow-400'
+                                    }`}>{selectedAlert.severity}</span>
                             )}
 
                             {/* Description */}

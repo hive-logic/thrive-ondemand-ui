@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadSession, UserSession } from "@/lib/session";
-import { getLocationWithAddress, Coordinates } from "@/lib/geolocation";
+import { getLocationWithAddress, requestUserLocation, Coordinates } from "@/lib/geolocation";
 import { useRouter } from "next/navigation";
 import { getWS, getActivityIdFromUrl, isWSOpen, subscribeWS, clearPublicUserData } from "@/lib/ws";
 import MarkdownMessage from "@/components/MarkdownMessage";
@@ -778,12 +778,19 @@ What's on your mind?`;
 
     const ws = getWS();
 
+    // Refresh GPS location (3s timeout, non-blocking on failure)
+    let freshLocation: any = userMeta?.location;
+    try {
+      const coords = await requestUserLocation(3000);
+      if (coords) freshLocation = { latitude: coords.latitude, longitude: coords.longitude };
+    } catch { /* GPS unavailable — use stale location */ }
+
     const basePayload = {
       activity_id: getActivityIdFromUrl(),
       session_id: session?.session_id ?? null,
       message: text,
       time: new Date().toISOString(),
-      user_meta: userMeta,
+      user_meta: { ...userMeta, location: freshLocation },
     };
     // eslint-disable-next-line no-console
     console.log("WS send base payload:", basePayload, {

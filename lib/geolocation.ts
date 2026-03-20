@@ -43,9 +43,10 @@ export async function requestUserLocation(timeoutMs = 12000): Promise<Coordinate
   });
 }
 
-const GOOGLE_GEOCODING_API_KEY = 'AIzaSyDZIEduNGQuiNaflS3K44bJkaN3tvQxI6I';
+const GOOGLE_GEOCODING_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_GEOCODING_KEY || '';
 
 async function reverseGeocodeGoogle(coords: Coordinates): Promise<string | null> {
+  if (!GOOGLE_GEOCODING_API_KEY) return null;
   try {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.latitude},${coords.longitude}&key=${GOOGLE_GEOCODING_API_KEY}&result_type=street_address|premise|subpremise|point_of_interest`;
     const res = await fetch(url);

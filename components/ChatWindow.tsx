@@ -602,7 +602,7 @@ What's on your mind?`;
   }
 
   /** Send a message to WS without showing it in the chat UI */
-  function sendHiddenMessage(text: string) {
+  function sendHiddenMessage(text: string, overrideUserMeta?: typeof userMeta) {
     if (!isWSOpen()) return;
     const ws = getWS();
     const payload = {
@@ -610,7 +610,7 @@ What's on your mind?`;
       session_id: session?.session_id ?? null,
       message: text,
       time: new Date().toISOString(),
-      user_meta: userMeta,
+      user_meta: overrideUserMeta ?? userMeta,
     };
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(payload));
@@ -704,7 +704,12 @@ What's on your mind?`;
             locationInfo = ` [Location: ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}]`;
           }
         }
-        sendHiddenMessage(`###sos###${label}: I need help!${locationInfo}`);
+        // Build fresh user_meta with updated GPS for the WS payload
+        const freshUserMeta = userMeta ? {
+          ...userMeta,
+          location: loc ?? userMeta.location,
+        } : userMeta;
+        sendHiddenMessage(`###sos###${label}: I need help!${locationInfo}`, freshUserMeta);
       } else {
         setSosCatCountdown(count);
       }

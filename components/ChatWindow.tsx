@@ -128,6 +128,10 @@ export default function ChatWindow() {
   const flushTimerRef = useRef<number | null>(null);
   const flushCompletePendingRef = useRef(false);
   const [connected, setConnected] = useState(false);
+  // SOS button state
+  const [sosCountdown, setSosCountdown] = useState<number | null>(null);
+  const sosTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sosTriggeredRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const locationText = useMemo(() => {
     if (!session?.location) return null;
@@ -558,6 +562,53 @@ What's on your mind?`;
     }
   }
 
+  /** Send a message to WS without showing it in the chat UI */
+  function sendHiddenMessage(text: string) {
+    if (!isWSOpen()) return;
+    const ws = getWS();
+    const payload = {
+      activity_id: getActivityIdFromUrl(),
+      session_id: session?.session_id ?? null,
+      message: text,
+      time: new Date().toISOString(),
+      user_meta: userMeta,
+    };
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
+      setSending(true);
+    }
+  }
+
+  // SOS press-and-hold handlers
+  function handleSOSStart() {
+    if (sosTimerRef.current) return;
+    sosTriggeredRef.current = false;
+    setSosCountdown(5);
+    let count = 5;
+    sosTimerRef.current = setInterval(() => {
+      count--;
+      if (count <= 0) {
+        // Trigger SOS
+        handleSOSClear();
+        sosTriggeredRef.current = true;
+        setSosCountdown(null);
+        sendHiddenMessage("###SOS###");
+      } else {
+        setSosCountdown(count);
+      }
+    }, 1000);
+  }
+
+  function handleSOSClear() {
+    if (sosTimerRef.current) {
+      clearInterval(sosTimerRef.current);
+      sosTimerRef.current = null;
+    }
+    if (!sosTriggeredRef.current) {
+      setSosCountdown(null);
+    }
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const text = input.trim();
@@ -976,11 +1027,24 @@ What's on your mind?`;
           </div>
         )}
         <button
+          onTouchStart={handleSOSStart}
+          onTouchEnd={handleSOSClear}
+          onTouchCancel={handleSOSClear}
+          onMouseDown={handleSOSStart}
+          onMouseUp={handleSOSClear}
+          onMouseLeave={handleSOSClear}
+          className="ml-auto px-3 py-1.5 text-xs font-bold rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors border border-red-500/50 select-none touch-manipulation"
+          title="Hold for 5 seconds to send SOS"
+          aria-label="SOS — hold for 5 seconds"
+        >
+          SOS
+        </button>
+        <button
           onClick={() => {
             clearPublicUserData();
             router.replace("/");
           }}
-          className="ml-auto px-3 py-1.5 text-xs font-medium rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors border border-white/10"
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors border border-white/10"
           title="End session and clear data"
         >
           Exit
@@ -1327,6 +1391,36 @@ What's on your mind?`;
               )}
             </div>
           </div>
+        </div>
+      )}
+      {/* SOS countdown overlay */}
+      {sosCountdown !== null && (
+        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="relative flex items-center justify-center">
+            {/* Pulsing ring */}
+            <div
+              className="absolute rounded-full border-4 border-red-500 animate-ping"
+              style={{ width: 160, height: 160 }}
+            />
+            {/* Expanding circle */}
+            <div
+              className="flex items-center justify-center rounded-full bg-red-600 transition-all duration-1000 ease-out"
+              style={{
+                width: 80 + (5 - sosCountdown) * 20,
+                height: 80 + (5 - sosCountdown) * 20,
+              }}
+            >
+              <span className="text-5xl font-bold text-white tabular-nums">
+                {sosCountdown}
+              </span>
+            </div>
+          </div>
+          <p className="mt-8 text-white/80 text-sm font-medium animate-pulse">
+            Hold to send SOS…
+          </p>
+          <p className="mt-2 text-white/50 text-xs">
+            Release to cancel
+          </p>
         </div>
       )}
     </div>

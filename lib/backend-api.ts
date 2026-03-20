@@ -205,6 +205,41 @@ export async function fetchLiveAlerts(customerId: string, accessToken: string): 
   }
 }
 
+export async function fetchLastNotification(customerId: string, accessToken: string): Promise<LiveAlert | null> {
+  try {
+    const url = `${API_BASE_URL}/v1/last_alert`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ customer_id: customerId }),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data && data.id && !data.error) {
+      return {
+        id: `notif_${data.id}`,
+        title: data.rule_name || 'Alert',
+        description: data.message || '',
+        location: data.site_name || '',
+        severity: 'high',
+        date_created: data.date_created || new Date().toISOString(),
+        seen_by: data.seen_by || [],
+        source: 'notification',
+        notification_id: data.id,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+
 export async function markAlertSeen(notificationId: string, userId: string, customerId: string, accessToken: string): Promise<boolean> {
   try {
     const url = `${API_BASE_URL}/v1/mark_event_alert_seen`;

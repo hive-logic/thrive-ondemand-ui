@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { fetchQuickActionsData, fetchAccessZones, fetchLiveAlerts, markAlertSeen, LiveAlert } from "@/lib/backend-api";
+import { fetchQuickActionsData, fetchAccessZones, fetchLiveAlerts, fetchLastNotification, markAlertSeen, LiveAlert } from "@/lib/backend-api";
 import {
     getAuthWS,
     isAuthWSOpen,
@@ -343,8 +343,7 @@ export default function AuthenticatedChatWindow() {
         const token = getStoredAccessToken();
         if (!token) return;
 
-        async function pollAlerts() {
-            const alert = await fetchLiveAlerts(user!.customer!.id, token!);
+        function addAlertIfNew(alert: LiveAlert | null) {
             if (!alert) return;
             // Skip if already dismissed locally
             if (seenAlertIds.current.has(alert.id)) return;
@@ -359,6 +358,15 @@ export default function AuthenticatedChatWindow() {
                 updated.sort((a, b) => new Date(b.date_created || '').getTime() - new Date(a.date_created || '').getTime());
                 return updated;
             });
+        }
+
+        async function pollAlerts() {
+            const [eventAlert, notification] = await Promise.all([
+                fetchLiveAlerts(user!.customer!.id, token!),
+                fetchLastNotification(user!.customer!.id, token!),
+            ]);
+            addAlertIfNew(eventAlert);
+            addAlertIfNew(notification);
         }
 
         pollAlerts(); // initial fetch

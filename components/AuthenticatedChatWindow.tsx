@@ -371,7 +371,7 @@ export default function AuthenticatedChatWindow() {
         }
 
         pollAlerts(); // initial fetch
-        const interval = setInterval(pollAlerts, 30_000);
+        const interval = setInterval(pollAlerts, 10_000);
         return () => clearInterval(interval);
     }, [user]);
 

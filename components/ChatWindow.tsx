@@ -17,6 +17,7 @@ type Message = {
   role: "assistant" | "user";
   content: string;
   attachment?: MessageAttachment;
+  failed?: boolean;
 };
 
 type PendingAttachment = MessageAttachment & {
@@ -38,6 +39,7 @@ type AlertState =
 type MessageBubbleProps = {
   msg: Message;
   isLast: boolean;
+  onRetry?: () => void;
 };
 
 const MessageBubble = memo(
@@ -48,9 +50,25 @@ const MessageBubble = memo(
         className={`flex ${isUser ? "justify-end" : "justify-start"} ${props.isLast ? "message-in" : ""
           }`}
       >
+        {/* Retry icon for failed user messages */}
+        {isUser && props.msg.failed && (
+          <button
+            onClick={props.onRetry}
+            className="flex items-center justify-center w-8 h-8 mr-2 self-center rounded-full bg-red-600/80 hover:bg-red-500 transition-colors shrink-0"
+            title="Tap to retry"
+            aria-label="Retry sending message"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+          </button>
+        )}
         <div
           className={`max-w-[80%] md:max-w-[70%] px-4 py-3 rounded-2xl border backdrop-blur ${isUser
-            ? "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
+            ? props.msg.failed
+              ? "bg-red-900/50 text-white/70 border-red-500/50 shadow-[0_8px_20px_rgba(220,38,38,0.25)]"
+              : "bg-primary text-white border-transparent shadow-[0_8px_20px_rgba(233,66,108,0.35)]"
             : "bg-white/5 text-white/90 border-white/10 shadow-[0_6px_18px_rgba(76,0,255,0.16)]"
             }`}
         >
@@ -85,7 +103,7 @@ const MessageBubble = memo(
       </div>
     );
   },
-  (prev, next) => prev.msg === next.msg && prev.isLast === next.isLast
+  (prev, next) => prev.msg === next.msg && prev.isLast === next.isLast && prev.onRetry === next.onRetry
 );
 
 const TypingIndicator = memo(function TypingIndicator() {
@@ -579,6 +597,31 @@ What's on your mind?`;
     }
   }
 
+  /** Retry sending a failed user message */
+  function retryMessage(msgId: string) {
+    const msg = messages.find((m) => m.id === msgId);
+    if (!msg || !msg.failed) return;
+
+    // Clear the failed flag
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, failed: false } : m))
+    );
+
+    // Resend via WS
+    const ws = getWS();
+    const payload = {
+      activity_id: getActivityIdFromUrl(),
+      session_id: session?.session_id ?? null,
+      message: msg.content,
+      time: new Date().toISOString(),
+      user_meta: userMeta,
+    };
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
+      setSending(true);
+    }
+  }
+
   // SOS press-and-hold handlers
   function handleSOSStart() {
     if (sosTimerRef.current) return;
@@ -891,6 +934,23 @@ What's on your mind?`;
           // eslint-disable-next-line no-console
           console.log("WS onmessage parsed:", data);
           if (data.type !== "message") return;
+
+          // Handle request_retry: mark last user message as failed
+          if (data.messageType === "request_retry") {
+            setMessages((prev) => {
+              const updated = [...prev];
+              for (let i = updated.length - 1; i >= 0; i--) {
+                if (updated[i].role === "user") {
+                  updated[i] = { ...updated[i], failed: true };
+                  break;
+                }
+              }
+              return updated;
+            });
+            setSending(false);
+            return;
+          }
+
           // Ensure streaming target exists
           if (!streamMsgIdRef.current) {
             const newId = crypto.randomUUID();
@@ -1062,6 +1122,7 @@ What's on your mind?`;
             key={m.id}
             msg={m}
             isLast={i === messages.length - 1}
+            onRetry={m.failed ? () => retryMessage(m.id) : undefined}
           />
         ))}
         {showQuickActions && messages.length <= 1 && !sending && (

@@ -1022,7 +1022,7 @@ What's on your mind?`;
     }
     // Stop any existing session
     if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch {}
+      try { recognitionRef.current.abort(); } catch { }
     }
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
@@ -1054,7 +1054,7 @@ What's on your mind?`;
     recognition.onend = () => {
       // If still in listening mode, restart (keeps listening until user stops)
       if (isListeningRef.current) {
-        try { recognition.start(); } catch {}
+        try { recognition.start(); } catch { }
       }
     };
 
@@ -1070,7 +1070,7 @@ What's on your mind?`;
   const stopListening = useCallback(() => {
     setIsListening(false);
     if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
+      try { recognitionRef.current.stop(); } catch { }
       recognitionRef.current = null;
     }
   }, []);
@@ -1079,7 +1079,7 @@ What's on your mind?`;
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch {}
+        try { recognitionRef.current.abort(); } catch { }
       }
     };
   }, []);
@@ -1512,11 +1512,11 @@ What's on your mind?`;
                 handleSend(e as any);
               }
             }}
-            placeholder="Type your message…"
+            placeholder="What's happening?"
             onFocus={handleFocus}
             onBlur={handleBlur}
             rows={1}
-            className="flex-1 min-w-0 min-h-[48px] max-h-[72px] rounded-xl bg-[#141415] border border-white/10 px-4 py-3 outline-none appearance-none placeholder:text-white/60 text-[16px] leading-6 focus:ring-2 focus:ring-primary/30 touch-manipulation resize-none overflow-hidden"
+            className="flex-1 min-w-0 min-h-[48px] max-h-[72px] rounded-xl bg-[#141415] border border-white/10 px-4 py-3 outline-none appearance-none placeholder:text-white/60 text-[14px] leading-6 focus:ring-2 focus:ring-primary/30 touch-manipulation resize-none overflow-hidden"
             aria-label="Message"
           />
           <button
@@ -1540,23 +1540,22 @@ What's on your mind?`;
                 handleSend(e as unknown as React.FormEvent);
               }
             }}
-            className={`h-12 md:h-12 inline-flex items-center justify-center gap-1.5 px-4 md:px-5 flex-shrink-0 touch-manipulation rounded-xl font-semibold text-sm transition-all duration-200 ${
-              isListening
+            className={`h-12 md:h-12 inline-flex items-center justify-center gap-1.5 px-4 md:px-5 flex-shrink-0 touch-manipulation rounded-xl font-semibold text-sm transition-all duration-200 ${isListening
                 ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
                 : 'btn-primary'
-            }`}
+              }`}
             aria-label={isListening ? 'Stop listening' : 'Send'}
           >
             {isListening ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="animate-[pulse_1s_ease-in-out_infinite]">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
               </svg>
             ) : (
               <>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="opacity-50">
-                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                 </svg>
                 Send
               </>
@@ -1747,20 +1746,20 @@ What's on your mind?`;
                   cat.color === "red"
                     ? "border-red-500/40"
                     : cat.color === "orange"
-                    ? "border-orange-500/40"
-                    : "border-yellow-500/40";
+                      ? "border-orange-500/40"
+                      : "border-yellow-500/40";
                 const bgActive =
                   cat.color === "red"
                     ? "bg-red-500/30"
                     : cat.color === "orange"
-                    ? "bg-orange-500/30"
-                    : "bg-yellow-500/30";
+                      ? "bg-orange-500/30"
+                      : "bg-yellow-500/30";
                 const bgIdle =
                   cat.color === "red"
                     ? "bg-red-500/10"
                     : cat.color === "orange"
-                    ? "bg-orange-500/10"
-                    : "bg-yellow-500/10";
+                      ? "bg-orange-500/10"
+                      : "bg-yellow-500/10";
                 return (
                   <button
                     key={cat.key}
@@ -1771,11 +1770,10 @@ What's on your mind?`;
                     onMouseUp={handleCatClear}
                     onMouseLeave={handleCatClear}
                     onContextMenu={(e) => e.preventDefault()}
-                    className={`relative flex flex-col items-center justify-center gap-1.5 py-5 rounded-2xl border text-center font-medium transition-all duration-300 active:scale-95 touch-manipulation ${
-                      isActive
+                    className={`relative flex flex-col items-center justify-center gap-1.5 py-5 rounded-2xl border text-center font-medium transition-all duration-300 active:scale-95 touch-manipulation ${isActive
                         ? `${bgActive} ${borderColor} scale-[1.03]`
                         : `${bgIdle} ${borderColor} hover:scale-[1.02]`
-                    }`}
+                      }`}
                     style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
                   >
                     <span className="text-3xl">{cat.icon}</span>

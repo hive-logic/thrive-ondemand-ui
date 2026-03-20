@@ -642,8 +642,8 @@ Use the quick buttons below to get started.`;
                                     }}
                                 >
                                     <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm ${alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                            alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                                'bg-amber-500/20 text-amber-400'
+                                        alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                            'bg-amber-500/20 text-amber-400'
                                         }`}>
                                         ⚠️
                                     </div>
@@ -653,8 +653,8 @@ Use the quick buttons below to get started.`;
                                         <div className="flex items-center gap-2 mt-1">
                                             {alert.severity && (
                                                 <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                                        alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                                            'bg-yellow-500/20 text-yellow-400'
+                                                    alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                                        'bg-yellow-500/20 text-yellow-400'
                                                     }`}>{alert.severity}</span>
                                             )}
                                             {alert.protocol_type && (
@@ -1053,7 +1053,7 @@ Use the quick buttons below to get started.`;
                         }}
                         placeholder="What's happening?"
                         rows={1}
-                        className="flex-1 min-w-0 min-h-[48px] max-h-[72px] rounded-xl bg-[#141415] border border-white/10 px-4 py-3 outline-none appearance-none placeholder:text-white/60 text-[16px] leading-6 focus:ring-2 focus:ring-primary/30 touch-manipulation resize-none overflow-hidden"
+                        className="flex-1 min-w-0 min-h-[48px] max-h-[72px] rounded-xl bg-[#141415] border border-white/10 px-4 py-3 outline-none appearance-none placeholder:text-white/60 text-[14px] leading-6 focus:ring-2 focus:ring-primary/30 touch-manipulation resize-none overflow-hidden"
                         aria-label="Message"
                     />
                     <button
@@ -1151,8 +1151,8 @@ Use the quick buttons below to get started.`;
                                 <div className="flex items-center gap-2 flex-wrap">
                                     {selectedAlert.severity && (
                                         <span className={`inline-block text-[10px] uppercase font-bold px-2.5 py-1 rounded-md ${selectedAlert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                                selectedAlert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                                    'bg-yellow-500/20 text-yellow-400'
+                                            selectedAlert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                                'bg-yellow-500/20 text-yellow-400'
                                             }`}>{selectedAlert.severity}</span>
                                     )}
                                     {selectedAlert.protocol_type && (

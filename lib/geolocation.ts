@@ -43,7 +43,22 @@ export async function requestUserLocation(timeoutMs = 12000): Promise<Coordinate
   });
 }
 
-async function reverseGeocode(coords: Coordinates, email?: string): Promise<string | null> {
+const GOOGLE_GEOCODING_API_KEY = 'AIzaSyDZIEduNGQuiNaflS3K44bJkaN3tvQxI6I';
+
+async function reverseGeocodeGoogle(coords: Coordinates): Promise<string | null> {
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.latitude},${coords.longitude}&key=${GOOGLE_GEOCODING_API_KEY}&result_type=street_address|premise|subpremise|point_of_interest`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = (await res.json()) as any;
+    if (data?.status !== 'OK' || !data?.results?.length) return null;
+    return data.results[0].formatted_address ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function reverseGeocodeNominatim(coords: Coordinates, email?: string): Promise<string | null> {
   try {
     const params = new URLSearchParams({
       format: 'jsonv2',
@@ -54,15 +69,10 @@ async function reverseGeocode(coords: Coordinates, email?: string): Promise<stri
     });
     if (email) params.set('email', email);
     const url = `https://nominatim.openstreetmap.org/reverse?${params.toString()}`;
-    const res = await fetch(url, {
-      headers: {
-        // UA cannot be set in browsers; referer will be present. Keep headers minimal.
-      }
-    });
+    const res = await fetch(url, { headers: {} });
     if (!res.ok) return null;
     const data = (await res.json()) as any;
     const a = data?.address ?? {};
-    // Prefer compact, human readable pieces
     const area = a.neighbourhood || a.suburb || a.city_district || a.state_district || null;
     const locality = a.city || a.town || a.village || a.county || null;
     const country = a.country || null;
@@ -74,6 +84,13 @@ async function reverseGeocode(coords: Coordinates, email?: string): Promise<stri
   } catch {
     return null;
   }
+}
+
+async function reverseGeocode(coords: Coordinates, email?: string): Promise<string | null> {
+  // Try Google first (building-level precision), fall back to Nominatim
+  const googleResult = await reverseGeocodeGoogle(coords);
+  if (googleResult) return googleResult;
+  return reverseGeocodeNominatim(coords, email);
 }
 
 export async function getLocationWithAddress(

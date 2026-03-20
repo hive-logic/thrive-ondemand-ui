@@ -9,7 +9,10 @@
 
 html, body {
   height: 100%;
-  overflow: hidden; /* lock page-level scroll; only inner containers can scroll */
+  max-width: 100vw;
+  width: 100%;
+  overflow: hidden;
+  overflow-x: hidden; /* explicit for Android Chrome */
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
   -webkit-user-select: none;

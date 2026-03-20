@@ -43,7 +43,7 @@ export default function RootLayout(props: { children: React.ReactNode }) {
         <PushNotificationManager />
         <IOSInstallPrompt />
         <AuthProvider>
-          <div className="min-h-screen">{props.children}</div>
+          <div className="min-h-screen overflow-x-hidden">{props.children}</div>
         </AuthProvider>
       </body>
     </html>

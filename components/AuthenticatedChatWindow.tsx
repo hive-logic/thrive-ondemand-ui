@@ -1188,6 +1188,30 @@ Use the quick buttons below to get started.`;
                                 </div>
                             )}
 
+                            {/* Triggers — for notification alerts */}
+                            {selectedAlert.triggers && selectedAlert.triggers.length > 0 && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Triggers</div>
+                                    <div className="text-[13px] text-white/80 space-y-0.5">
+                                        {selectedAlert.triggers.map((t, i) => (
+                                            <div key={i} className="flex items-center gap-1.5"><span>🎯</span> {t}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Actions — for notification alerts */}
+                            {selectedAlert.actions && selectedAlert.actions.length > 0 && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Actions Taken</div>
+                                    <div className="text-[13px] text-white/80 space-y-0.5">
+                                        {selectedAlert.actions.map((a, i) => (
+                                            <div key={i} className="flex items-center gap-1.5"><span>⚡</span> {a}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Reporter + Time — side by side */}
                             {(selectedAlert.reporter_name || selectedAlert.date_created) && (
                                 <div className="grid grid-cols-2 gap-3">
@@ -1220,6 +1244,23 @@ Use the quick buttons below to get started.`;
                                 className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-[0.98]"
                             >
                                 Dismiss
+                            </button>
+                            {/* Ask Varca — for all alert types */}
+                            <button
+                                onClick={() => {
+                                    const title = selectedAlert.title || 'Alert';
+                                    const loc = selectedAlert.location ? ` at ${selectedAlert.location}` : '';
+                                    const time = selectedAlert.date_created ? ` on ${new Date(selectedAlert.date_created).toLocaleString()}` : '';
+                                    const desc = selectedAlert.description ? ` — ${selectedAlert.description}` : '';
+                                    // Human-readable message shown in chat
+                                    const userMsg = `🔔 Alert: ${title}${loc}${time}.${desc} What should I know about this alert?`;
+                                    sendAll(userMsg);
+                                    dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
+                                    setSelectedAlert(null);
+                                }}
+                                className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-primary/20 border border-primary/30 text-primary hover:bg-primary/30 transition-all active:scale-[0.98]"
+                            >
+                                💬 Ask Varca
                             </button>
                             {selectedAlert.protocol_type && (
                                 <button

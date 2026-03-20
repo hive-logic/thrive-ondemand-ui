@@ -175,6 +175,8 @@ export type LiveAlert = {
   seen_by?: string[];
   notification_id?: string;
   source?: string;
+  triggers?: string[];
+  actions?: string[];
 };
 
 export async function fetchLiveAlerts(customerId: string, accessToken: string): Promise<LiveAlert | null> {
@@ -221,16 +223,62 @@ export async function fetchLastNotification(customerId: string, accessToken: str
     if (!response.ok) return null;
     const data = await response.json();
     if (data && data.id && !data.error) {
+      // Parse raw message into human-readable description
+      const rawMsg: string = data.message || '';
+      let description = '';
+      if (rawMsg.includes('** Rule **') || rawMsg.includes('** Actions **')) {
+        const ruleName = data.rule_name || 'Unknown Rule';
+        // Extract timestamp
+        const tsMatch = rawMsg.match(/Event Timestamp:\s*([^\|]+)/);
+        let timeStr = '';
+        if (tsMatch) {
+          try {
+            const cleaned = tsMatch[1].trim().split('(')[0].trim();
+            timeStr = new Date(cleaned).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          } catch { timeStr = ''; }
+        }
+        // Extract action counts
+        const countMatch = rawMsg.match(/Count:\s*(\d+)/);
+        const successMatch = rawMsg.match(/Success:\s*(\d+)/);
+        const failedMatch = rawMsg.match(/Failed:\s*(\d+)/);
+        const count = countMatch ? parseInt(countMatch[1]) : 0;
+        const success = successMatch ? parseInt(successMatch[1]) : 0;
+        const failed = failedMatch ? parseInt(failedMatch[1]) : 0;
+
+        description = `Rule "${ruleName}" triggered`;
+        if (timeStr) description += ` at ${timeStr}`;
+        description += '.';
+        if (count > 0) {
+          description += ` ${count} action${count > 1 ? 's' : ''} executed (${success} success, ${failed} failed).`;
+        } else {
+          description += ' No actions taken.';
+        }
+      } else {
+        description = rawMsg;
+      }
+
+      // Build trigger summary for popup
+      const triggers: string[] = (data.triggers || []).map((t: any) =>
+        t?.name ? `${t.type ? t.type + ': ' : ''}${t.name}` : ''
+      ).filter(Boolean);
+
+      // Build action summary for popup  
+      const actions: string[] = (data.actions || []).map((a: any) =>
+        a?.name ? `${a.type ? a.type + ': ' : ''}${a.name}` : ''
+      ).filter(Boolean);
+
       return {
         id: `notif_${data.id}`,
         title: data.rule_name || 'Alert',
-        description: data.message || '',
+        description,
         location: data.site_name || '',
         severity: 'high',
         date_created: data.date_created || new Date().toISOString(),
         seen_by: data.seen_by || [],
         source: 'notification',
         notification_id: data.id,
+        triggers,
+        actions: actions,
       };
     }
     return null;

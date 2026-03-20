@@ -615,14 +615,13 @@ Use the quick buttons below to get started.`;
                     ) : (
                         <div className="space-y-2 max-h-[40vh] overflow-y-auto">
                             {liveAlerts.map((alert) => (
-                                <button
+                                <div
                                     key={alert.id}
-                                    type="button"
+                                    className="w-full flex items-start gap-3 p-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] transition-all text-left cursor-pointer"
                                     onClick={() => {
                                         setSelectedAlert(alert);
                                         setAlertsOpen(false);
                                     }}
-                                    className="w-full flex items-start gap-3 p-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] transition-all text-left"
                                 >
                                     <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm ${
                                         alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
@@ -650,7 +649,18 @@ Use the quick buttons below to get started.`;
                                             )}
                                         </div>
                                     </div>
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            dismissAlertById(alert.id, alert.notification_id);
+                                        }}
+                                        className="mt-0.5 w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-all flex-shrink-0"
+                                        title="Dismiss alert"
+                                    >
+                                        🗑️
+                                    </button>
+                                </div>
                             ))}
                         </div>
                     )}

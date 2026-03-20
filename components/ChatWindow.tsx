@@ -1500,37 +1500,41 @@ What's on your mind?`;
             aria-label="Message"
           />
           <button
-            type={sendWasLongPress.current ? "button" : "submit"}
-            disabled={
-              !isListening && (sending || (!input.trim() && !pendingAttachment) || !connected)
-            }
+            type="button"
             onMouseDown={(e) => e.preventDefault()}
             onTouchStart={handleSendTouchStart}
             onTouchEnd={handleSendTouchEnd}
             onClick={(e) => {
               if (sendWasLongPress.current) {
-                e.preventDefault();
+                // Long press already handled — absorb click
                 sendWasLongPress.current = false;
+                return;
+              }
+              if (isListening) {
+                // Tap while listening → stop mic
+                stopListening();
+                return;
+              }
+              // Normal send
+              if (connected && (input.trim() || pendingAttachment) && !sending) {
+                handleSend(e as unknown as React.FormEvent);
               }
             }}
-            className={`h-12 md:h-12 inline-flex items-center justify-center gap-1.5 px-4 md:px-5 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation rounded-xl font-semibold text-sm transition-all duration-200 ${
+            className={`h-12 md:h-12 inline-flex items-center justify-center gap-1.5 px-4 md:px-5 flex-shrink-0 touch-manipulation rounded-xl font-semibold text-sm transition-all duration-200 ${
               isListening
-                ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
+                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
                 : 'btn-primary'
             }`}
             aria-label={isListening ? 'Stop listening' : 'Send'}
           >
             {isListening ? (
-              <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                </svg>
-                Stop
-              </>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="animate-[pulse_1s_ease-in-out_infinite]">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+              </svg>
             ) : (
               <>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="opacity-60">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="opacity-50">
                   <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
                   <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
                 </svg>

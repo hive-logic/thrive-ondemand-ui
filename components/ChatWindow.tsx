@@ -150,6 +150,25 @@ export default function ChatWindow() {
   const [sosCountdown, setSosCountdown] = useState<number | null>(null);
   const sosTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sosTriggeredRef = useRef(false);
+
+  // SOS category grid state
+  const [showSOSGrid, setShowSOSGrid] = useState(false);
+  const [sosCatCountdown, setSosCatCountdown] = useState<number | null>(null);
+  const [activeSosCat, setActiveSosCat] = useState<string | null>(null);
+  const sosCatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sosCatTriggeredRef = useRef(false);
+
+  const SOS_CATEGORIES = [
+    { key: "fire", icon: "🔥", label: "Fire", color: "red" },
+    { key: "active_shooter", icon: "🔫", label: "Active Shooter", color: "red" },
+    { key: "bomb_threat", icon: "💣", label: "Bomb Threat", color: "red" },
+    { key: "intrusion", icon: "🚨", label: "Intrusion", color: "orange" },
+    { key: "fall_medical", icon: "🏥", label: "Medical", color: "yellow" },
+    { key: "gas_leak", icon: "☁️", label: "Gas Leak", color: "orange" },
+    { key: "hazmat_spill", icon: "☢️", label: "Hazmat Spill", color: "orange" },
+    { key: "evacuation", icon: "🏃", label: "Evacuation", color: "yellow" },
+    { key: "general_alert", icon: "⚠️", label: "General Alert", color: "red" },
+  ];
   const scrollRef = useRef<HTMLDivElement>(null);
   const locationText = useMemo(() => {
     if (!session?.location) return null;
@@ -631,11 +650,11 @@ What's on your mind?`;
     sosTimerRef.current = setInterval(() => {
       count--;
       if (count <= 0) {
-        // Trigger SOS
+        // Show SOS category grid
         handleSOSClear();
         sosTriggeredRef.current = true;
         setSosCountdown(null);
-        sendHiddenMessage("###SOS###");
+        setShowSOSGrid(true);
       } else {
         setSosCountdown(count);
       }
@@ -649,6 +668,41 @@ What's on your mind?`;
     }
     if (!sosTriggeredRef.current) {
       setSosCountdown(null);
+    }
+  }
+
+  // SOS category hold-to-confirm handlers
+  function handleCatStart(catKey: string) {
+    if (sosCatTimerRef.current) return;
+    sosCatTriggeredRef.current = false;
+    setActiveSosCat(catKey);
+    setSosCatCountdown(3);
+    let count = 3;
+    sosCatTimerRef.current = setInterval(() => {
+      count--;
+      if (count <= 0) {
+        handleCatClear();
+        sosCatTriggeredRef.current = true;
+        setSosCatCountdown(null);
+        setActiveSosCat(null);
+        setShowSOSGrid(false);
+        const cat = SOS_CATEGORIES.find((c) => c.key === catKey);
+        const label = cat?.label || catKey;
+        sendHiddenMessage(`###sos###${label}: I need help!`);
+      } else {
+        setSosCatCountdown(count);
+      }
+    }, 1000);
+  }
+
+  function handleCatClear() {
+    if (sosCatTimerRef.current) {
+      clearInterval(sosCatTimerRef.current);
+      sosCatTimerRef.current = null;
+    }
+    if (!sosCatTriggeredRef.current) {
+      setSosCatCountdown(null);
+      setActiveSosCat(null);
     }
   }
 
@@ -1462,13 +1516,12 @@ What's on your mind?`;
           className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm select-none"
           style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
           onContextMenu={(e) => e.preventDefault()}
-        >          <div className="relative flex items-center justify-center">
-            {/* Pulsing ring */}
+        >
+          <div className="relative flex items-center justify-center">
             <div
               className="absolute rounded-full border-4 border-red-500 animate-ping"
               style={{ width: 160, height: 160 }}
             />
-            {/* Expanding circle */}
             <div
               className="flex items-center justify-center rounded-full bg-red-600 transition-all duration-1000 ease-out"
               style={{
@@ -1487,6 +1540,94 @@ What's on your mind?`;
           <p className="mt-2 text-white/50 text-xs">
             Release to cancel
           </p>
+        </div>
+      )}
+
+      {/* SOS emergency category grid */}
+      {showSOSGrid && (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col bg-black/90 backdrop-blur-md select-none"
+          style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-safe mt-4 mb-2">
+            <div>
+              <h2 className="text-xl font-bold text-white">🚨 Emergency Type</h2>
+              <p className="text-white/60 text-xs mt-1">
+                Hold a button for 3 seconds to send alert
+              </p>
+            </div>
+            <button
+              onClick={() => { setShowSOSGrid(false); handleCatClear(); }}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* 3x3 Grid */}
+          <div className="flex-1 flex items-center justify-center px-5">
+            <div className="grid grid-cols-3 gap-3 w-full max-w-md">
+              {SOS_CATEGORIES.map((cat) => {
+                const isActive = activeSosCat === cat.key;
+                const borderColor =
+                  cat.color === "red"
+                    ? "border-red-500/40"
+                    : cat.color === "orange"
+                    ? "border-orange-500/40"
+                    : "border-yellow-500/40";
+                const bgActive =
+                  cat.color === "red"
+                    ? "bg-red-500/30"
+                    : cat.color === "orange"
+                    ? "bg-orange-500/30"
+                    : "bg-yellow-500/30";
+                const bgIdle =
+                  cat.color === "red"
+                    ? "bg-red-500/10"
+                    : cat.color === "orange"
+                    ? "bg-orange-500/10"
+                    : "bg-yellow-500/10";
+                return (
+                  <button
+                    key={cat.key}
+                    onTouchStart={() => handleCatStart(cat.key)}
+                    onTouchEnd={handleCatClear}
+                    onTouchCancel={handleCatClear}
+                    onMouseDown={() => handleCatStart(cat.key)}
+                    onMouseUp={handleCatClear}
+                    onMouseLeave={handleCatClear}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className={`relative flex flex-col items-center justify-center gap-1.5 py-5 rounded-2xl border text-center font-medium transition-all duration-300 active:scale-95 touch-manipulation ${
+                      isActive
+                        ? `${bgActive} ${borderColor} scale-[1.03]`
+                        : `${bgIdle} ${borderColor} hover:scale-[1.02]`
+                    }`}
+                    style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+                  >
+                    <span className="text-3xl">{cat.icon}</span>
+                    <span className="text-[11px] text-white/90 leading-tight">
+                      {cat.label}
+                    </span>
+                    {/* Countdown overlay */}
+                    {isActive && sosCatCountdown !== null && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/60 backdrop-blur-sm">
+                        <span className="text-4xl font-bold text-white tabular-nums animate-pulse">
+                          {sosCatCountdown}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Footer hint */}
+          <div className="px-5 pb-safe mb-4 text-center">
+            <p className="text-white/40 text-xs">Press and hold to confirm</p>
+          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadSession, UserSession } from "@/lib/session";
 import { getLocationWithAddress, Coordinates } from "@/lib/geolocation";
 import { useRouter } from "next/navigation";
@@ -159,6 +159,12 @@ export default function ChatWindow() {
   const sosCatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sosCatTriggeredRef = useRef(false);
   const sosLocationRef = useRef<Coordinates | null>(null);
+
+  // ── Speech-to-Text state ──
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const sendLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sendWasLongPress = useRef(false);
 
   const SOS_CATEGORIES = [
     { key: "fire", icon: "🔥", label: "Fire", color: "red" },
@@ -996,6 +1002,99 @@ What's on your mind?`;
     });
   }
 
+  // ── Speech Recognition helpers ──
+  const startListening = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('Speech recognition not supported');
+      return;
+    }
+    // Stop any existing session
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch {}
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let finalTranscript = input; // start from existing input
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += (finalTranscript ? ' ' : '') + t;
+        } else {
+          interim = t;
+        }
+      }
+      setInput(finalTranscript + (interim ? ' ' + interim : ''));
+    };
+
+    recognition.onerror = (event: any) => {
+      console.warn('Speech recognition error:', event.error);
+      if (event.error !== 'no-speech') {
+        setIsListening(false);
+      }
+    };
+
+    recognition.onend = () => {
+      // If still in listening mode, restart (keeps listening until user stops)
+      if (isListening) {
+        try { recognition.start(); } catch {}
+      } else {
+        setIsListening(false);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch (e) {
+      console.error('Failed to start speech recognition:', e);
+    }
+  }, [input, isListening]);
+
+  const stopListening = useCallback(() => {
+    setIsListening(false);
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+      recognitionRef.current = null;
+    }
+  }, []);
+
+  // Cleanup recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+      }
+    };
+  }, []);
+
+  // Send button long-press handlers
+  const handleSendTouchStart = useCallback(() => {
+    sendWasLongPress.current = false;
+    sendLongPressTimer.current = setTimeout(() => {
+      sendWasLongPress.current = true;
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
+    }, 800); // 800ms long press
+  }, [isListening, startListening, stopListening]);
+
+  const handleSendTouchEnd = useCallback(() => {
+    if (sendLongPressTimer.current) {
+      clearTimeout(sendLongPressTimer.current);
+      sendLongPressTimer.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     const ws = getWS();
     setConnected(ws.readyState === WebSocket.OPEN);
@@ -1401,15 +1500,43 @@ What's on your mind?`;
             aria-label="Message"
           />
           <button
-            type="submit"
+            type={sendWasLongPress.current ? "button" : "submit"}
             disabled={
-              sending || (!input.trim() && !pendingAttachment) || !connected
+              !isListening && (sending || (!input.trim() && !pendingAttachment) || !connected)
             }
             onMouseDown={(e) => e.preventDefault()}
-            className="btn-primary h-12 md:h-12 inline-flex items-center justify-center px-4 md:px-5 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation"
-            aria-label="Send"
+            onTouchStart={handleSendTouchStart}
+            onTouchEnd={handleSendTouchEnd}
+            onClick={(e) => {
+              if (sendWasLongPress.current) {
+                e.preventDefault();
+                sendWasLongPress.current = false;
+              }
+            }}
+            className={`h-12 md:h-12 inline-flex items-center justify-center gap-1.5 px-4 md:px-5 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation rounded-xl font-semibold text-sm transition-all duration-200 ${
+              isListening
+                ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
+                : 'btn-primary'
+            }`}
+            aria-label={isListening ? 'Stop listening' : 'Send'}
           >
-            Send
+            {isListening ? (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+                Stop
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="opacity-60">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+                Send
+              </>
+            )}
           </button>
         </div>
       </form>

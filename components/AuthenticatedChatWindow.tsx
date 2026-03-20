@@ -260,6 +260,7 @@ export default function AuthenticatedChatWindow() {
     // ── Live Alerts state ──
     const [liveAlerts, setLiveAlerts] = useState<LiveAlert[]>([]);
     const [alertsOpen, setAlertsOpen] = useState(false);
+    const [selectedAlert, setSelectedAlert] = useState<LiveAlert | null>(null);
     const seenAlertIds = useRef<Set<string>>(new Set());
 
     // ── Speech-to-Text state ──
@@ -576,11 +577,8 @@ Use the quick buttons below to get started.`;
                                     key={alert.id}
                                     type="button"
                                     onClick={() => {
-                                        const msg = `Tell me about the alert: "${alert.title}". Description: ${alert.description || 'N/A'}. Location: ${alert.location || 'Unknown'}. Protocol: ${alert.protocol_type || 'general'}. Severity: ${alert.severity || 'unknown'}.`;
-                                        sendAll(msg, 'alert_inquiry');
+                                        setSelectedAlert(alert);
                                         setAlertsOpen(false);
-                                        // Remove from local list
-                                        setLiveAlerts((prev) => prev.filter((a) => a.id !== alert.id));
                                     }}
                                     className="w-full flex items-start gap-3 p-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] transition-all text-left"
                                 >
@@ -1046,6 +1044,135 @@ Use the quick buttons below to get started.`;
                     </button>
                 </div>
             </form>
+
+            {/* ── Event Alert Detail Popup ── */}
+            {selectedAlert && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+                     onClick={(e) => { if (e.target === e.currentTarget) { setSelectedAlert(null); } }}>
+                    <div className="w-full max-w-md bg-[#1c1d20] rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="text-xl">
+                                    {selectedAlert.protocol_type === 'fire' ? '🔥' :
+                                     selectedAlert.protocol_type === 'active_shooter' ? '🔫' :
+                                     selectedAlert.protocol_type === 'bomb_threat' ? '💣' :
+                                     selectedAlert.protocol_type === 'medical' ? '🏥' : '⚠️'}
+                                </span>
+                                <h3 className="text-[15px] font-semibold text-white truncate">{selectedAlert.title}</h3>
+                            </div>
+                            <button onClick={() => setSelectedAlert(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/50 transition-colors flex-shrink-0">
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+                            {/* Severity badge */}
+                            {selectedAlert.severity && (
+                                <span className={`inline-block text-[10px] uppercase font-bold px-2.5 py-1 rounded-md ${
+                                    selectedAlert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                    selectedAlert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                    'bg-yellow-500/20 text-yellow-400'
+                                }`}>{selectedAlert.severity}</span>
+                            )}
+
+                            {/* Description */}
+                            {selectedAlert.description && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Description</div>
+                                    <div className="text-[13px] text-white/80 leading-relaxed">{selectedAlert.description}</div>
+                                </div>
+                            )}
+
+                            {/* Location */}
+                            {selectedAlert.location && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Location</div>
+                                    <div className="text-[13px] text-white/80 flex items-center gap-1.5">
+                                        <span>📍</span> {selectedAlert.location}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Observed Location */}
+                            {selectedAlert.observed_location && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Observed Location</div>
+                                    <div className="text-[13px] text-white/80 flex items-center gap-1.5">
+                                        <span>🎯</span> {selectedAlert.observed_location}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Protocol */}
+                            {selectedAlert.protocol_type && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Protocol</div>
+                                    <div className="text-[13px] text-white/80">{selectedAlert.protocol_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+                                </div>
+                            )}
+
+                            {/* Reporter */}
+                            {selectedAlert.reporter_name && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Reported by</div>
+                                    <div className="text-[13px] text-white/80 flex items-center gap-1.5">
+                                        <span>👤</span> {selectedAlert.reporter_name}
+                                        {selectedAlert.reporter_email && <span className="text-white/40 text-[11px]">({selectedAlert.reporter_email})</span>}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Activity */}
+                            {selectedAlert.activity_name && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Event</div>
+                                    <div className="text-[13px] text-white/80 flex items-center gap-1.5">
+                                        <span>📅</span> {selectedAlert.activity_name}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Time */}
+                            {selectedAlert.date_created && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Time</div>
+                                    <div className="text-[13px] text-white/80">{new Date(selectedAlert.date_created).toLocaleString()}</div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="px-5 py-4 border-t border-white/[0.08] flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setLiveAlerts((prev) => prev.filter((a) => a.id !== selectedAlert.id));
+                                    setSelectedAlert(null);
+                                }}
+                                className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-[0.98]"
+                            >
+                                Dismiss
+                            </button>
+                            {selectedAlert.protocol_type && (
+                                <button
+                                    onClick={() => {
+                                        const protocolType = selectedAlert.protocol_type!;
+                                        const alertTitle = selectedAlert.title || 'Event Alert';
+                                        const alertMsg = `###alert###Execute ${protocolType} protocol immediately. Alert: ${alertTitle}###`;
+                                        sendAll(alertMsg);
+                                        setLiveAlerts((prev) => prev.filter((a) => a.id !== selectedAlert.id));
+                                        setSelectedAlert(null);
+                                    }}
+                                    className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all active:scale-[0.98]"
+                                >
+                                    ⚠️ {selectedAlert.protocol_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — Activate
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

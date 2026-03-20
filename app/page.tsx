@@ -5,7 +5,7 @@ import NotificationPopup from "@/components/NotificationPopup";
 import LoginModal from "@/components/LoginModal";
 import { useAuth } from "@/components/AuthContext";
 import { useRouter } from "next/navigation";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
 
@@ -13,12 +13,36 @@ export default function Page() {
   const { isAuthenticated, isLoading, logout, user } = useAuth();
   const router = useRouter();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       router.replace("/dashboard");
     }
   }, [isAuthenticated, isLoading, router]);
+
+  // Force video to always play — mobile browsers sometimes pause it
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    const forcePlay = () => {
+      vid.play().catch(() => {});
+    };
+    vid.addEventListener("pause", forcePlay);
+    vid.addEventListener("ended", forcePlay);
+    // Also try to play on visibility change (e.g. tab switch)
+    const onVisChange = () => {
+      if (document.visibilityState === "visible") forcePlay();
+    };
+    document.addEventListener("visibilitychange", onVisChange);
+    // Initial kick
+    forcePlay();
+    return () => {
+      vid.removeEventListener("pause", forcePlay);
+      vid.removeEventListener("ended", forcePlay);
+      document.removeEventListener("visibilitychange", onVisChange);
+    };
+  }, []);
 
   const handleLoginSuccess = () => {
     router.replace("/dashboard");
@@ -30,7 +54,9 @@ export default function Page() {
       {/* ── Video background (hero only) ── */}
       <div className="fixed inset-0 -z-10">
         <video
+          ref={videoRef}
           autoPlay muted loop playsInline
+          controls={false}
           preload="auto"
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
           src="/video.mp4"

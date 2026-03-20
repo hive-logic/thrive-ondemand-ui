@@ -688,7 +688,17 @@ What's on your mind?`;
         setShowSOSGrid(false);
         const cat = SOS_CATEGORIES.find((c) => c.key === catKey);
         const label = cat?.label || catKey;
-        sendHiddenMessage(`###sos###${label}: I need help!`);
+        // Include GPS location if available
+        let locationInfo = "";
+        if (session?.location) {
+          const loc = session.location;
+          if (loc.formatted && loc.formatted.trim()) {
+            locationInfo = ` [User GPS: ${loc.formatted}]`;
+          } else if (loc.latitude && loc.longitude) {
+            locationInfo = ` [User GPS: ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}]`;
+          }
+        }
+        sendHiddenMessage(`###sos###${label}: I need help!${locationInfo}`);
       } else {
         setSosCatCountdown(count);
       }

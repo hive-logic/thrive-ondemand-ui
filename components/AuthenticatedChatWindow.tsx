@@ -1133,12 +1133,22 @@ Use the quick buttons below to get started.`;
 
                         {/* Body */}
                         <div className="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
-                            {/* Severity badge */}
-                            {selectedAlert.severity && (
-                                <span className={`inline-block text-[10px] uppercase font-bold px-2.5 py-1 rounded-md ${selectedAlert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                        selectedAlert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                            'bg-yellow-500/20 text-yellow-400'
-                                    }`}>{selectedAlert.severity}</span>
+
+                            {/* Row 1: Severity + Protocol — same line */}
+                            {(selectedAlert.severity || selectedAlert.protocol_type) && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {selectedAlert.severity && (
+                                        <span className={`inline-block text-[10px] uppercase font-bold px-2.5 py-1 rounded-md ${selectedAlert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                                selectedAlert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                                    'bg-yellow-500/20 text-yellow-400'
+                                            }`}>{selectedAlert.severity}</span>
+                                    )}
+                                    {selectedAlert.protocol_type && (
+                                        <span className="inline-block text-[10px] uppercase font-bold px-2.5 py-1 rounded-md bg-white/5 text-white/60">
+                                            Protocol: {selectedAlert.protocol_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                        </span>
+                                    )}
+                                </div>
                             )}
 
                             {/* Description */}
@@ -1149,42 +1159,56 @@ Use the quick buttons below to get started.`;
                                 </div>
                             )}
 
-                            {/* Location + Observed Location — side by side */}
-                            {(selectedAlert.location || selectedAlert.observed_location) && (
+                            {/* Row 3: Event + Reported By — side by side */}
+                            {(selectedAlert.activity_name || selectedAlert.reporter_name) && (
                                 <div className="grid grid-cols-2 gap-3">
-                                    {selectedAlert.location && (
+                                    {selectedAlert.activity_name && (
                                         <div>
-                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Location</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Event</div>
                                             <div className="text-[13px] text-white/80 flex items-center gap-1.5">
-                                                <span>📍</span> {selectedAlert.location}
+                                                <span>📅</span> {selectedAlert.activity_name}
                                             </div>
                                         </div>
                                     )}
-                                    {selectedAlert.observed_location && (
+                                    {selectedAlert.reporter_name && (
                                         <div>
-                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Observed Location</div>
-                                            <div className="text-[13px] text-white/80 flex items-center gap-1.5">
-                                                <span>🎯</span> {selectedAlert.observed_location}
+                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Reported by</div>
+                                            <div className="text-[13px] text-white/80 flex items-start gap-1.5">
+                                                <span className="mt-0.5">👤</span>
+                                                <div>
+                                                    <div>{selectedAlert.reporter_name}</div>
+                                                    {selectedAlert.reporter_email && <div className="text-white/40 text-[11px] mt-0.5 break-all">{selectedAlert.reporter_email}</div>}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
                                 </div>
                             )}
 
-                            {/* Protocol */}
-                            {selectedAlert.protocol_type && (
+                            {/* Row 4: Time — single line */}
+                            {selectedAlert.date_created && (
                                 <div>
-                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Protocol</div>
-                                    <div className="text-[13px] text-white/80">{selectedAlert.protocol_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Time</div>
+                                    <div className="text-[13px] text-white/80">{new Date(selectedAlert.date_created).toLocaleString()}</div>
                                 </div>
                             )}
 
-                            {/* Activity */}
-                            {selectedAlert.activity_name && (
+                            {/* Row 5: Claimed Location — single line */}
+                            {selectedAlert.location && (
                                 <div>
-                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Event</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Claimed Location</div>
                                     <div className="text-[13px] text-white/80 flex items-center gap-1.5">
-                                        <span>📅</span> {selectedAlert.activity_name}
+                                        <span>📍</span> {selectedAlert.location}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Row 6: Observed Location — single line, wrap allowed */}
+                            {selectedAlert.observed_location && (
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Observed Location</div>
+                                    <div className="text-[13px] text-white/80 flex items-start gap-1.5 break-words">
+                                        <span className="flex-shrink-0">🎯</span> <span>{selectedAlert.observed_location}</span>
                                     </div>
                                 </div>
                             )}
@@ -1210,30 +1234,6 @@ Use the quick buttons below to get started.`;
                                             <div key={i} className="flex items-center gap-1.5"><span>⚡</span> {a}</div>
                                         ))}
                                     </div>
-                                </div>
-                            )}
-
-                            {/* Reporter + Time — side by side */}
-                            {(selectedAlert.reporter_name || selectedAlert.date_created) && (
-                                <div className="grid grid-cols-2 gap-3">
-                                    {selectedAlert.reporter_name && (
-                                        <div>
-                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Reported by</div>
-                                            <div className="text-[13px] text-white/80 flex items-start gap-1.5">
-                                                <span className="mt-0.5">👤</span>
-                                                <div>
-                                                    <div>{selectedAlert.reporter_name}</div>
-                                                    {selectedAlert.reporter_email && <div className="text-white/40 text-[11px] mt-0.5 break-all">{selectedAlert.reporter_email}</div>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {selectedAlert.date_created && (
-                                        <div>
-                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Time</div>
-                                            <div className="text-[13px] text-white/80">{new Date(selectedAlert.date_created).toLocaleString()}</div>
-                                        </div>
-                                    )}
                                 </div>
                             )}
                         </div>

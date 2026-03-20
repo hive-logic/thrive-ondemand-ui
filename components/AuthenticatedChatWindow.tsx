@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { fetchQuickActionsData, fetchAccessZones } from "@/lib/backend-api";
+import { fetchQuickActionsData, fetchAccessZones, fetchLiveAlerts, LiveAlert } from "@/lib/backend-api";
 import {
     getAuthWS,
     isAuthWSOpen,
@@ -257,6 +257,11 @@ export default function AuthenticatedChatWindow() {
     const [activeSheet, setActiveSheet] = useState<SheetConfig | null>(null);
     const [expandedSite, setExpandedSite] = useState<string | null>(null);
 
+    // ── Live Alerts state ──
+    const [liveAlerts, setLiveAlerts] = useState<LiveAlert[]>([]);
+    const [alertsOpen, setAlertsOpen] = useState(false);
+    const seenAlertIds = useRef<Set<string>>(new Set());
+
     // ── Speech-to-Text state ──
     const [isListening, setIsListening] = useState(false);
     const isListeningRef = useRef(false);
@@ -293,6 +298,29 @@ export default function AuthenticatedChatWindow() {
             }
         }
         loadActions();
+    }, [user]);
+
+    // Poll for live alerts every 30s
+    useEffect(() => {
+        if (!user?.customer?.id) return;
+        const token = getStoredAccessToken();
+        if (!token) return;
+
+        async function pollAlerts() {
+            const alert = await fetchLiveAlerts(user!.customer!.id, token!);
+            if (alert && !seenAlertIds.current.has(alert.id)) {
+                seenAlertIds.current.add(alert.id);
+                setLiveAlerts((prev) => {
+                    const updated = [alert, ...prev.filter((a) => a.id !== alert.id)];
+                    updated.sort((a, b) => new Date(b.date_created || '').getTime() - new Date(a.date_created || '').getTime());
+                    return updated;
+                });
+            }
+        }
+
+        pollAlerts(); // initial fetch
+        const interval = setInterval(pollAlerts, 30_000);
+        return () => clearInterval(interval);
     }, [user]);
 
     // Lightweight zone-only refresh — returns fresh zones for immediate use
@@ -512,6 +540,17 @@ Use the quick buttons below to get started.`;
                     <div className="text-sm font-semibold">VARCA</div>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
+                    {/* Live Alerts Button */}
+                    <button type="button" onClick={() => { setAlertsOpen((o) => !o); if (actionsOpen) setActionsOpen(false); }}
+                        className={`relative inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${alertsOpen ? "bg-white/15 border-white/20 text-white" : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"}`}>
+                        <span>🔔</span>
+                        <span>Alerts</span>
+                        {liveAlerts.length > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1 animate-pulse">
+                                {liveAlerts.length}
+                            </span>
+                        )}
+                    </button>
                     <button type="button" onClick={() => { setActionsOpen((o) => !o); if (actionsOpen) closeSubmenu(); }}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${actionsOpen ? "bg-white/15 border-white/20 text-white" : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"}`}>
                         <span>⚡</span>
@@ -523,6 +562,60 @@ Use the quick buttons below to get started.`;
                     <div className="text-xs text-white/40">{!connected ? "Reconnecting…" : ""}</div>
                 </div>
             </div>
+
+            {/* Live Alerts Panel */}
+            {alertsOpen && (
+                <div className="px-4 md:px-6 py-4 border-b border-white/[0.08] bg-[#1a1b1e]/60 backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 duration-300 relative z-10">
+                    <div className="text-[10px] uppercase tracking-[0.15em] text-white/50 font-bold mb-3">Live Alerts</div>
+                    {liveAlerts.length === 0 ? (
+                        <div className="text-center py-6 text-white/40 text-sm">No live alerts</div>
+                    ) : (
+                        <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+                            {liveAlerts.map((alert) => (
+                                <button
+                                    key={alert.id}
+                                    type="button"
+                                    onClick={() => {
+                                        const msg = `Tell me about the alert: "${alert.title}". Description: ${alert.description || 'N/A'}. Location: ${alert.location || 'Unknown'}. Protocol: ${alert.protocol_type || 'general'}. Severity: ${alert.severity || 'unknown'}.`;
+                                        sendAll(msg, 'alert_inquiry');
+                                        setAlertsOpen(false);
+                                        // Remove from local list
+                                        setLiveAlerts((prev) => prev.filter((a) => a.id !== alert.id));
+                                    }}
+                                    className="w-full flex items-start gap-3 p-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] transition-all text-left"
+                                >
+                                    <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm ${
+                                        alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                        alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                        'bg-amber-500/20 text-amber-400'
+                                    }`}>
+                                        ⚠️
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[13px] font-medium text-white/90 truncate">{alert.title}</div>
+                                        {alert.description && <div className="text-[11px] text-white/50 mt-0.5 line-clamp-2">{alert.description}</div>}
+                                        <div className="flex items-center gap-2 mt-1">
+                                            {alert.severity && (
+                                                <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                                                    alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                                    alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                                    'bg-yellow-500/20 text-yellow-400'
+                                                }`}>{alert.severity}</span>
+                                            )}
+                                            {alert.protocol_type && (
+                                                <span className="text-[10px] text-white/40">{alert.protocol_type.replace(/_/g, ' ')}</span>
+                                            )}
+                                            {alert.date_created && (
+                                                <span className="text-[10px] text-white/30 ml-auto">{new Date(alert.date_created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Quick Actions Panel — button grid */}
             {actionsOpen && (

@@ -158,3 +158,47 @@ export async function fetchAccessZones(customerId: string, accessToken: string):
     return null;
   }
 }
+
+export type LiveAlert = {
+  id: string;
+  title: string;
+  description?: string;
+  location?: string;
+  observed_location?: string;
+  protocol_type?: string;
+  severity?: string;
+  reporter_name?: string;
+  reporter_email?: string;
+  activity_name?: string;
+  date_created?: string;
+  user_gps_coordinates?: string;
+  seen_by?: string[];
+};
+
+export async function fetchLiveAlerts(customerId: string, accessToken: string): Promise<LiveAlert | null> {
+  try {
+    const url = `${API_BASE_URL}/v1/last_event_alert`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ customer_id: customerId }),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data && data.id && !data.error) {
+      return {
+        ...data,
+        title: data.title || 'Event Alert',
+        date_created: data.date_created || new Date().toISOString(),
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

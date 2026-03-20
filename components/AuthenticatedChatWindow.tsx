@@ -513,7 +513,7 @@ Use the quick buttons below to get started.`;
         const ws = getAuthWS();
         const userMeta = getAuthUserMeta();
         const messageToSend = payloadStr ? `###quick_actions###${payloadStr}###` : text;
-        const payload = { user_uuid: userMeta?.id, message: messageToSend, time: new Date().toISOString(), user_meta: userMeta, session_id: getOrCreateSessionId() };
+        const payload = { user_uuid: userMeta?.id, message: messageToSend, time: new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZoneName: "short" }), user_meta: userMeta, session_id: getOrCreateSessionId() };
         if (ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(payload)); setSending(true); }
     }
 
@@ -576,7 +576,7 @@ Use the quick buttons below to get started.`;
             if (coords) locationData = { latitude: coords.latitude, longitude: coords.longitude };
         } catch { /* GPS unavailable — proceed without */ }
         const enrichedMeta = locationData ? { ...userMeta, location: locationData } : userMeta;
-        const payload = { user_uuid: userMeta?.id, message: text, time: new Date().toISOString(), user_meta: enrichedMeta, session_id: getOrCreateSessionId() };
+        const payload = { user_uuid: userMeta?.id, message: text, time: new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZoneName: "short" }), user_meta: enrichedMeta, session_id: getOrCreateSessionId() };
         if (ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(payload)); setSending(true); }
     }
 

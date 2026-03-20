@@ -601,7 +601,7 @@ What's on your mind?`;
       activity_id: getActivityIdFromUrl(),
       session_id: session?.session_id ?? null,
       message: text,
-      time: new Date().toISOString(),
+      time: new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZoneName: "short" }),
       user_meta: userMeta,
     };
 
@@ -619,7 +619,7 @@ What's on your mind?`;
       activity_id: getActivityIdFromUrl(),
       session_id: session?.session_id ?? null,
       message: text,
-      time: new Date().toISOString(),
+      time: new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZoneName: "short" }),
       user_meta: overrideUserMeta ?? userMeta,
     };
     if (ws.readyState === WebSocket.OPEN) {
@@ -644,7 +644,7 @@ What's on your mind?`;
       activity_id: getActivityIdFromUrl(),
       session_id: session?.session_id ?? null,
       message: msg.content,
-      time: new Date().toISOString(),
+      time: new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZoneName: "short" }),
       user_meta: userMeta,
     };
     if (ws.readyState === WebSocket.OPEN) {
@@ -789,7 +789,7 @@ What's on your mind?`;
       activity_id: getActivityIdFromUrl(),
       session_id: session?.session_id ?? null,
       message: text,
-      time: new Date().toISOString(),
+      time: new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZoneName: "short" }),
       user_meta: { ...userMeta, location: freshLocation },
     };
     // eslint-disable-next-line no-console

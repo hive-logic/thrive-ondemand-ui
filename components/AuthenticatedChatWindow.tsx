@@ -150,7 +150,20 @@ const MessageBubble = memo(
                     }`}>
                     <div>
                         {isUser ? (
-                            <p className="whitespace-pre-wrap">{props.msg.content}</p>
+                            <p className="whitespace-pre-wrap">{(() => {
+                                const c = props.msg.content;
+                                const alertMatch = c.match(/^###alert###(.+?)###$/);
+                                if (alertMatch) {
+                                    const inner = alertMatch[1];
+                                    const protoMatch = inner.match(/Execute (\S+) protocol immediately\.\s*Alert:\s*(.+)/);
+                                    if (protoMatch) {
+                                        const proto = protoMatch[1].replace(/_/g, ' ').replace(/\b\w/g, (ch: string) => ch.toUpperCase());
+                                        return `⚠️ Activated ${proto} protocol for: ${protoMatch[2]}`;
+                                    }
+                                    return `⚠️ ${inner}`;
+                                }
+                                return c;
+                            })()}</p>
                         ) : (
                             <MarkdownMessage content={props.msg.content} />
                         )}
@@ -1114,23 +1127,25 @@ Use the quick buttons below to get started.`;
                                 </div>
                             )}
 
-                            {/* Location */}
-                            {selectedAlert.location && (
-                                <div>
-                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Location</div>
-                                    <div className="text-[13px] text-white/80 flex items-center gap-1.5">
-                                        <span>📍</span> {selectedAlert.location}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Observed Location */}
-                            {selectedAlert.observed_location && (
-                                <div>
-                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Observed Location</div>
-                                    <div className="text-[13px] text-white/80 flex items-center gap-1.5">
-                                        <span>🎯</span> {selectedAlert.observed_location}
-                                    </div>
+                            {/* Location + Observed Location — side by side */}
+                            {(selectedAlert.location || selectedAlert.observed_location) && (
+                                <div className="grid grid-cols-2 gap-3">
+                                    {selectedAlert.location && (
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Location</div>
+                                            <div className="text-[13px] text-white/80 flex items-center gap-1.5">
+                                                <span>📍</span> {selectedAlert.location}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {selectedAlert.observed_location && (
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Observed Location</div>
+                                            <div className="text-[13px] text-white/80 flex items-center gap-1.5">
+                                                <span>🎯</span> {selectedAlert.observed_location}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -1139,17 +1154,6 @@ Use the quick buttons below to get started.`;
                                 <div>
                                     <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Protocol</div>
                                     <div className="text-[13px] text-white/80">{selectedAlert.protocol_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
-                                </div>
-                            )}
-
-                            {/* Reporter */}
-                            {selectedAlert.reporter_name && (
-                                <div>
-                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Reported by</div>
-                                    <div className="text-[13px] text-white/80 flex items-center gap-1.5">
-                                        <span>👤</span> {selectedAlert.reporter_name}
-                                        {selectedAlert.reporter_email && <span className="text-white/40 text-[11px]">({selectedAlert.reporter_email})</span>}
-                                    </div>
                                 </div>
                             )}
 
@@ -1163,11 +1167,24 @@ Use the quick buttons below to get started.`;
                                 </div>
                             )}
 
-                            {/* Time */}
-                            {selectedAlert.date_created && (
-                                <div>
-                                    <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Time</div>
-                                    <div className="text-[13px] text-white/80">{new Date(selectedAlert.date_created).toLocaleString()}</div>
+                            {/* Reporter + Time — side by side */}
+                            {(selectedAlert.reporter_name || selectedAlert.date_created) && (
+                                <div className="grid grid-cols-2 gap-3">
+                                    {selectedAlert.reporter_name && (
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Reported by</div>
+                                            <div className="text-[13px] text-white/80 flex items-center gap-1.5">
+                                                <span>👤</span> {selectedAlert.reporter_name}
+                                                {selectedAlert.reporter_email && <span className="text-white/40 text-[11px]">({selectedAlert.reporter_email})</span>}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {selectedAlert.date_created && (
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Time</div>
+                                            <div className="text-[13px] text-white/80">{new Date(selectedAlert.date_created).toLocaleString()}</div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

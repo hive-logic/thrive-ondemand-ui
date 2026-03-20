@@ -173,6 +173,8 @@ export type LiveAlert = {
   date_created?: string;
   user_gps_coordinates?: string;
   seen_by?: string[];
+  notification_id?: string;
+  source?: string;
 };
 
 export async function fetchLiveAlerts(customerId: string, accessToken: string): Promise<LiveAlert | null> {
@@ -200,5 +202,23 @@ export async function fetchLiveAlerts(customerId: string, accessToken: string): 
     return null;
   } catch {
     return null;
+  }
+}
+
+export async function markAlertSeen(notificationId: string, userId: string, customerId: string, accessToken: string): Promise<boolean> {
+  try {
+    const url = `${API_BASE_URL}/v1/mark_event_alert_seen`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ notification_id: notificationId, user_id: userId, customer_id: customerId }),
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }

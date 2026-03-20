@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { fetchQuickActionsData, fetchAccessZones, fetchLiveAlerts, LiveAlert } from "@/lib/backend-api";
+import { fetchQuickActionsData, fetchAccessZones, fetchLiveAlerts, markAlertSeen, LiveAlert } from "@/lib/backend-api";
 import {
     getAuthWS,
     isAuthWSOpen,
@@ -261,7 +261,30 @@ export default function AuthenticatedChatWindow() {
     const [liveAlerts, setLiveAlerts] = useState<LiveAlert[]>([]);
     const [alertsOpen, setAlertsOpen] = useState(false);
     const [selectedAlert, setSelectedAlert] = useState<LiveAlert | null>(null);
-    const seenAlertIds = useRef<Set<string>>(new Set());
+    const seenAlertIds = useRef<Set<string>>(
+        typeof window !== 'undefined' && localStorage.getItem('dismissedAlertIds')
+            ? new Set<string>(JSON.parse(localStorage.getItem('dismissedAlertIds')!) as string[])
+            : new Set<string>()
+    );
+
+    // Helper: dismiss an alert (localStorage + backend seen_by)
+    const dismissAlertById = useCallback((alertId: string, notificationId?: string) => {
+        // Add to seenAlertIds ref
+        seenAlertIds.current.add(alertId);
+        // Persist to localStorage
+        try {
+            localStorage.setItem('dismissedAlertIds', JSON.stringify([...seenAlertIds.current]));
+        } catch {}
+        // Remove from local list
+        setLiveAlerts((prev) => prev.filter((a) => a.id !== alertId));
+        // Mark seen on backend if notification_id is available
+        if (notificationId && user?.id && user?.customer?.id) {
+            const token = getStoredAccessToken();
+            if (token) {
+                markAlertSeen(notificationId, user.id, user.customer.id, token).catch(() => {});
+            }
+        }
+    }, [user]);
 
     // ── Speech-to-Text state ──
     const [isListening, setIsListening] = useState(false);
@@ -309,14 +332,20 @@ export default function AuthenticatedChatWindow() {
 
         async function pollAlerts() {
             const alert = await fetchLiveAlerts(user!.customer!.id, token!);
-            if (alert && !seenAlertIds.current.has(alert.id)) {
+            if (!alert) return;
+            // Skip if already dismissed locally
+            if (seenAlertIds.current.has(alert.id)) return;
+            // Skip if backend says seen by this user
+            if (alert.seen_by && Array.isArray(alert.seen_by) && user?.id && alert.seen_by.includes(user.id)) {
                 seenAlertIds.current.add(alert.id);
-                setLiveAlerts((prev) => {
-                    const updated = [alert, ...prev.filter((a) => a.id !== alert.id)];
-                    updated.sort((a, b) => new Date(b.date_created || '').getTime() - new Date(a.date_created || '').getTime());
-                    return updated;
-                });
+                return;
             }
+            setLiveAlerts((prev) => {
+                if (prev.some((a) => a.id === alert.id)) return prev;
+                const updated = [alert, ...prev];
+                updated.sort((a, b) => new Date(b.date_created || '').getTime() - new Date(a.date_created || '').getTime());
+                return updated;
+            });
         }
 
         pollAlerts(); // initial fetch
@@ -1147,7 +1176,7 @@ Use the quick buttons below to get started.`;
                         <div className="px-5 py-4 border-t border-white/[0.08] flex gap-3">
                             <button
                                 onClick={() => {
-                                    setLiveAlerts((prev) => prev.filter((a) => a.id !== selectedAlert.id));
+                                    dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
                                     setSelectedAlert(null);
                                 }}
                                 className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-[0.98]"
@@ -1161,7 +1190,7 @@ Use the quick buttons below to get started.`;
                                         const alertTitle = selectedAlert.title || 'Event Alert';
                                         const alertMsg = `###alert###Execute ${protocolType} protocol immediately. Alert: ${alertTitle}###`;
                                         sendAll(alertMsg);
-                                        setLiveAlerts((prev) => prev.filter((a) => a.id !== selectedAlert.id));
+                                        dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
                                         setSelectedAlert(null);
                                     }}
                                     className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all active:scale-[0.98]"

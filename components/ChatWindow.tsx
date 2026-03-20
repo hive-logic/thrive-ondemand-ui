@@ -1446,7 +1446,7 @@ What's on your mind?`;
             </div>
           </div>
         )}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-end gap-2 sm:gap-3">
           <button
             type="button"
             onClick={handleCameraClick}
@@ -1499,13 +1499,24 @@ What's on your mind?`;
             className="hidden"
             onChange={handleMediaSelected}
           />
-          <input
+          <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 48 + 24) + 'px';
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend(e as any);
+              }
+            }}
             placeholder="Type your message…"
             onFocus={handleFocus}
             onBlur={handleBlur}
-            className="flex-1 min-w-0 h-12 md:h-12 rounded-xl bg-[#141415] border border-white/10 px-4 py-0 outline-none appearance-none placeholder:text-white/60 text-[16px] leading-6 focus:ring-2 focus:ring-primary/30 touch-manipulation"
+            rows={1}
+            className="flex-1 min-w-0 min-h-[48px] max-h-[72px] rounded-xl bg-[#141415] border border-white/10 px-4 py-3 outline-none appearance-none placeholder:text-white/60 text-[16px] leading-6 focus:ring-2 focus:ring-primary/30 touch-manipulation resize-none overflow-hidden"
             aria-label="Message"
           />
           <button

@@ -596,6 +596,9 @@ Use the quick buttons below to get started.`;
                         className={`relative inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${alertsOpen ? "bg-white/15 border-white/20 text-white" : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"}`}>
                         <span>🔔</span>
                         <span>Alerts</span>
+                        <svg className={`w-3 h-3 transition-transform ${alertsOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                         {liveAlerts.length > 0 && (
                             <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1 animate-pulse">
                                 {liveAlerts.length}

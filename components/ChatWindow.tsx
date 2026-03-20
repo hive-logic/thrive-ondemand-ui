@@ -1233,7 +1233,7 @@ What's on your mind?`;
     };
   }, []);
   return (
-    <div className="relative flex flex-col h-full pb-safe">
+    <div className="relative flex flex-col h-full pb-safe overflow-x-hidden">
       {/* Ambient background effects */}
       <div
         aria-hidden

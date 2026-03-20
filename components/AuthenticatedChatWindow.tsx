@@ -582,7 +582,7 @@ Use the quick buttons below to get started.`;
 
     // ─── Render ─────────────────────────────────────────────────────────────
     return (
-        <div className="relative flex flex-col h-full pb-safe">
+        <div className="relative flex flex-col h-full pb-safe overflow-x-hidden">
             {/* Ambient background */}
             <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
                 <div className="absolute -top-24 -left-24 h-80 w-80 rounded-full bg-primary/30 blur-3xl animate-pulse-slow" />

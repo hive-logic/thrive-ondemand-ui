@@ -1823,6 +1823,7 @@ What's on your mind?`;
                     {sosCatCountdown}
                   </span>
                 </div>
+                <p className="mt-4 text-white/70 text-sm font-medium animate-pulse">Keep holding…</p>
               </div>
             );
           })()}

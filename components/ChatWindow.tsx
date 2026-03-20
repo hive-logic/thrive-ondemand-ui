@@ -2,6 +2,7 @@
 
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { loadSession, UserSession } from "@/lib/session";
+import { getLocationWithAddress, Coordinates } from "@/lib/geolocation";
 import { useRouter } from "next/navigation";
 import { getWS, getActivityIdFromUrl, isWSOpen, subscribeWS, clearPublicUserData } from "@/lib/ws";
 import MarkdownMessage from "@/components/MarkdownMessage";
@@ -157,6 +158,7 @@ export default function ChatWindow() {
   const [activeSosCat, setActiveSosCat] = useState<string | null>(null);
   const sosCatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sosCatTriggeredRef = useRef(false);
+  const sosLocationRef = useRef<Coordinates | null>(null);
 
   const SOS_CATEGORIES = [
     { key: "fire", icon: "🔥", label: "Fire", color: "red" },
@@ -650,10 +652,14 @@ What's on your mind?`;
     sosTimerRef.current = setInterval(() => {
       count--;
       if (count <= 0) {
-        // Show SOS category grid
+        // Show SOS category grid — refresh GPS first
         handleSOSClear();
         sosTriggeredRef.current = true;
         setSosCountdown(null);
+        // Refresh GPS in background, then show grid
+        getLocationWithAddress(session?.email, 6000).then((loc) => {
+          sosLocationRef.current = loc;
+        });
         setShowSOSGrid(true);
       } else {
         setSosCountdown(count);
@@ -688,14 +694,14 @@ What's on your mind?`;
         setShowSOSGrid(false);
         const cat = SOS_CATEGORIES.find((c) => c.key === catKey);
         const label = cat?.label || catKey;
-        // Include GPS location if available
+        // Use fresh GPS location (refreshed on SOS trigger) or fall back to session location
+        const loc = sosLocationRef.current || session?.location;
         let locationInfo = "";
-        if (session?.location) {
-          const loc = session.location;
+        if (loc) {
           if (loc.formatted && loc.formatted.trim()) {
-            locationInfo = ` [User GPS: ${loc.formatted}]`;
+            locationInfo = ` [Location: ${loc.formatted}]`;
           } else if (loc.latitude && loc.longitude) {
-            locationInfo = ` [User GPS: ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}]`;
+            locationInfo = ` [Location: ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}]`;
           }
         }
         sendHiddenMessage(`###sos###${label}: I need help!${locationInfo}`);

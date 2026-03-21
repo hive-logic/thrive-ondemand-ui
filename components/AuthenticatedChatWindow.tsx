@@ -761,7 +761,7 @@ Use the quick buttons below to get started.`;
                         {/* Zone-wide door commands */}
                         <button type="button"
                             onClick={() => openZoneSheet({ title: "Zone Lock", icon: "🔒", sheetType: "standard", allPayloadType: "door_lock_all", allMessage: "Lock down all access zones", itemPayloadType: "zone_lock_single", itemLabelPrefix: "Lock down zone" })}
-                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Zone Lock" ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-100" : "border-indigo-500/20 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500/15"}`}>
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Zone Lock" ? "bg-slate-500/20 border-slate-400/40 text-slate-100" : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:bg-white/[0.08] hover:text-white"}`}>
                             <span className="text-lg">🔒</span>
                             <span>Zone Lock</span>
                         </button>
@@ -779,7 +779,7 @@ Use the quick buttons below to get started.`;
                         </button>
                         <button type="button"
                             onClick={() => openZoneSheet({ title: "Cancel Lock", icon: "❌", sheetType: "standard", allPayloadType: "zone_cancel_lock_down", allMessage: "Cancel lockdown on all access zones", itemPayloadType: "zone_cancel_single", itemLabelPrefix: "Cancel lockdown zone" })}
-                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Cancel Lock" ? "bg-violet-500/20 border-violet-500/40 text-violet-100" : "border-violet-500/20 bg-violet-500/5 text-violet-300 hover:bg-violet-500/15"}`}>
+                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border text-[11px] font-medium transition-all duration-300 active:scale-95 ${activeSheet?.title === "Cancel Lock" ? "bg-rose-500/20 border-rose-500/40 text-rose-100" : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:bg-white/[0.08] hover:text-white"}`}>
                             <span className="text-lg">❌</span>
                             <span>Cancel Lock</span>
                         </button>

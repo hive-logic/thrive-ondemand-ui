@@ -418,6 +418,15 @@ Use the quick buttons below to get started.`;
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [messages]);
 
+    // Also scroll when typing indicator appears
+    useEffect(() => {
+        if (sending) {
+            setTimeout(() => {
+                scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+            }, 50);
+        }
+    }, [sending]);
+
     // WebSocket connection
     useEffect(() => {
         const ws = getAuthWS();

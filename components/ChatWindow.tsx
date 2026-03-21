@@ -247,6 +247,18 @@ What's on your mind?`;
     });
   }, [messages]);
 
+  // Also scroll when typing indicator appears
+  useEffect(() => {
+    if (sending) {
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 50); // small delay to let the indicator render first
+    }
+  }, [sending]);
+
   // JSON + binary paketlemek için yardımcılar
   async function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {

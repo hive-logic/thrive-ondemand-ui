@@ -1318,7 +1318,9 @@ Use the quick buttons below to get started.`;
                                             severity: 9,
                                             activity_id: selectedAlert.activity_id || '',
                                         });
-                                        sendAll(`###quick_actions###${payload}###`);
+                                        const friendlyLabel = protocolLabels[protocolType] || '⚠️ Alert';
+                                        const siteName = selectedAlert.site_name || selectedAlert.activity_name || 'the site';
+                                        sendQuickAction(`Activating ${friendlyLabel} protocol at ${siteName}`, payload);
                                         dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
                                         setSelectedAlert(null);
                                     }}

@@ -315,6 +315,7 @@ export default function AuthenticatedChatWindow() {
     const tokenQueueRef = useRef<string[]>([]);
     const flushTimerRef = useRef<number | null>(null);
     const flushCompletePendingRef = useRef(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Fetch quick actions data
     useEffect(() => {
@@ -565,6 +566,10 @@ Use the quick buttons below to get started.`;
         const text = input.trim();
         if (!text || !isAuthWSOpen()) return;
         setInput("");
+        // Reset textarea height after send
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+        }
         const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text };
         setMessages((m) => [...m, userMsg]);
         const ws = getAuthWS();
@@ -1038,6 +1043,7 @@ Use the quick buttons below to get started.`;
             <form onSubmit={handleSend} className="px-4 md:px-6 py-3 sm:py-4 border-t border-white/10 bg-[#121213]">
                 <div className="flex items-end gap-2 sm:gap-3">
                     <textarea
+                        ref={textareaRef}
                         value={input}
                         onChange={(e) => {
                             setInput(e.target.value);

@@ -146,6 +146,7 @@ export default function ChatWindow() {
   const tokenQueueRef = useRef<string[]>([]);
   const flushTimerRef = useRef<number | null>(null);
   const flushCompletePendingRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [connected, setConnected] = useState(false);
   // SOS button state
   const [sosCountdown, setSosCountdown] = useState<number | null>(null);
@@ -747,6 +748,10 @@ What's on your mind?`;
     }
 
     setInput("");
+    // Reset textarea height after send
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     setShowQuickActions(false);
     const attachmentToSend = pendingAttachment;
     if (attachmentToSend) {
@@ -1500,6 +1505,7 @@ What's on your mind?`;
             onChange={handleMediaSelected}
           />
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => {
               setInput(e.target.value);

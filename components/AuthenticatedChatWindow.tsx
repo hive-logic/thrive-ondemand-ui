@@ -430,7 +430,7 @@ Use the quick buttons below to get started.`;
     // WebSocket connection
     useEffect(() => {
         const ws = getAuthWS();
-        setConnected(ws.readyState === WebSocket.OPEN);
+        setConnected(ws?.readyState === WebSocket.OPEN);
 
         const unsubscribe = subscribeAuthWS({
             onMessage: (event) => {

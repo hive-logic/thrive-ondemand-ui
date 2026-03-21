@@ -170,6 +170,9 @@ export type LiveAlert = {
   reporter_name?: string;
   reporter_email?: string;
   activity_name?: string;
+  activity_id?: string;
+  site_id?: string;
+  site_name?: string;
   date_created?: string;
   user_gps_coordinates?: string;
   seen_by?: string[];

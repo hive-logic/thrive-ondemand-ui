@@ -1297,17 +1297,37 @@ Use the quick buttons below to get started.`;
                                 <button
                                     onClick={() => {
                                         const protocolType = selectedAlert.protocol_type!;
-                                        const alertTitle = selectedAlert.title || 'Event Alert';
-                                        const alertMsg = `###alert###Execute ${protocolType} protocol immediately. Alert: ${alertTitle}###`;
-                                        sendAll(alertMsg);
+                                        const protocolLabels: Record<string, string> = {
+                                            fire: '🔥 Fire Alert',
+                                            active_shooter: '🔫 Active Shooter',
+                                            fall_medical: '🏥 Medical Emergency',
+                                            intrusion: '🚨 Intrusion Alert',
+                                            general_alert: '⚠️ General Alert',
+                                        };
+                                        const protocolColors: Record<string, string> = {
+                                            fire: 'red', active_shooter: 'red',
+                                            fall_medical: 'blue', intrusion: 'red', general_alert: 'red',
+                                        };
+                                        const payload = JSON.stringify({
+                                            type: 'protocol_execute',
+                                            protocol: protocolType,
+                                            protocol_label: protocolLabels[protocolType] || '⚠️ Alert',
+                                            site_id: selectedAlert.site_id || '',
+                                            site_name: selectedAlert.site_name || selectedAlert.activity_name || 'Event',
+                                            color: protocolColors[protocolType] || 'red',
+                                            severity: 9,
+                                            activity_id: selectedAlert.activity_id || '',
+                                        });
+                                        sendAll(`###quick_actions###${payload}###`);
                                         dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
                                         setSelectedAlert(null);
                                     }}
                                     className="w-full py-3 rounded-xl text-[13px] font-semibold bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all active:scale-[0.98]"
                                 >
-                                    ⚠️ {selectedAlert.protocol_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — Activate Protocol
+                                    ⚠️ Activate {selectedAlert.protocol_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Protocol
                                 </button>
                             )}
+
                         </div>
                     </div>
                 </div>

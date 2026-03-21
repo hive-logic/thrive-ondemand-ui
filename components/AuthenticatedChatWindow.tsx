@@ -655,11 +655,21 @@ Use the quick buttons below to get started.`;
                                         setAlertsOpen(false);
                                     }}
                                 >
-                                    <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm ${alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                    <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm ${
+                                        alert.protocol_type === 'fire' ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/40' :
+                                        alert.protocol_type === 'active_shooter' ? 'bg-red-600/30 text-red-300 ring-1 ring-red-400/50 animate-pulse' :
+                                        alert.protocol_type === 'fall_medical' ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/30' :
+                                        alert.protocol_type === 'intrusion' ? 'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/30' :
+                                        alert.protocol_type === 'general_alert' ? 'bg-orange-500/20 text-orange-400 ring-1 ring-orange-500/30' :
+                                        alert.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
                                         alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                            'bg-amber-500/20 text-amber-400'
-                                        }`}>
-                                        ⚠️
+                                        'bg-amber-500/20 text-amber-400'
+                                    }`}>
+                                        {alert.protocol_type === 'fire' ? '🔥' :
+                                         alert.protocol_type === 'active_shooter' ? '🔫' :
+                                         alert.protocol_type === 'fall_medical' ? '🏥' :
+                                         alert.protocol_type === 'intrusion' ? '🚨' :
+                                         '⚠️'}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-[13px] font-medium text-white/90 truncate">{alert.title}</div>

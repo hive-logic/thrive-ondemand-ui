@@ -41,6 +41,8 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
     };
 
     const backToCredentials = () => {
+        setEmail("");
+        setPassword("");
         setOtpRequired(false);
         setOtp("");
         setError(null);

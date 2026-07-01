@@ -122,6 +122,15 @@ function getAuthWsUrl(): string {
     return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
 
+/**
+ * Mask the `token` query param so the access token never reaches the console
+ * (console history, screen shares, error-reporting tools). Host/path/clientId
+ * stay visible for debugging.
+ */
+function redactWsUrl(url: string): string {
+    return url.replace(/([?&]token=)[^&]*/i, "$1<redacted>");
+}
+
 function connectAuth(): WebSocket {
     // If already connecting or open, return existing socket
     if (authSocket && authSocket.readyState !== WebSocket.CLOSED) {
@@ -141,7 +150,7 @@ function connectAuth(): WebSocket {
     try {
         const url = getAuthWsUrl();
         // eslint-disable-next-line no-console
-        console.log("Auth WS connecting to:", url, "clientId:", getAuthClientId());
+        console.log("Auth WS connecting to:", redactWsUrl(url), "clientId:", getAuthClientId());
         authSocket = new WebSocket(url);
 
         authSocket.addEventListener("open", () => {

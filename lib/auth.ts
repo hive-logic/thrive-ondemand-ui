@@ -37,6 +37,34 @@ export interface AuthError {
 }
 
 /**
+ * Typed error for Directus auth API failures.
+ * Carries the Directus error code (errors[0].extensions.code) so callers
+ * can distinguish INVALID_OTP (2FA required) from INVALID_CREDENTIALS.
+ */
+export class AuthApiError extends Error {
+  code?: string;
+  status?: number;
+
+  constructor(message: string, code?: string, status?: number) {
+    super(message);
+    this.name = 'AuthApiError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
+/**
+ * True when a login failure means "TFA is enabled, provide an OTP".
+ * Primary signal is the INVALID_OTP code; a message match is a robust
+ * fallback in case Directus wording/codes change across versions.
+ */
+export function isOtpRequiredError(err: unknown): boolean {
+  if (err instanceof AuthApiError && err.code === 'INVALID_OTP') return true;
+  const msg = err instanceof Error ? err.message : '';
+  return /otp|2fa|two-factor|tfa/i.test(msg);
+}
+
+/**
  * Login with email and password
  */
 export async function login(email: string, password: string): Promise<{ user: DirectusUser; auth: AuthResponse }> {

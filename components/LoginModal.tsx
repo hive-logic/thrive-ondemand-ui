@@ -243,7 +243,7 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
                     )}
 
                     {error && (
-                        <p className="text-xs text-red-400 text-center">{error}</p>
+                        <p role="alert" aria-live="polite" className="text-xs text-red-400 text-center">{error}</p>
                     )}
 
                     <button

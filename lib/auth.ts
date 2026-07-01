@@ -65,20 +65,34 @@ export function isOtpRequiredError(err: unknown): boolean {
 }
 
 /**
- * Login with email and password
+ * Login with email and password (and OTP if the account has TFA enabled).
+ * On the first attempt omit `otp`; if Directus returns INVALID_OTP, retry
+ * with the 6-digit code.
  */
-export async function login(email: string, password: string): Promise<{ user: DirectusUser; auth: AuthResponse }> {
+export async function login(
+  email: string,
+  password: string,
+  otp?: string,
+): Promise<{ user: DirectusUser; auth: AuthResponse }> {
+  const body: { email: string; password: string; otp?: string } = { email, password };
+  if (otp) body.otp = otp; // never send otp:"" — Directus may treat it differently
+
   const response = await fetch(`${BACKEND_URL}/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error?.errors?.[0]?.message || 'Login failed. Please check your credentials.');
+    const parsed = await response.json().catch(() => ({}));
+    const first = parsed?.errors?.[0];
+    throw new AuthApiError(
+      first?.message || 'Login failed. Please check your credentials.',
+      first?.extensions?.code,
+      response.status,
+    );
   }
 
   const data = await response.json();

@@ -31,26 +31,63 @@ export interface AuthResponse {
   expires: number; // milliseconds until expiry
 }
 
-export interface AuthError {
-  message: string;
+/**
+ * Typed error for Directus auth API failures.
+ * Carries the Directus error code (errors[0].extensions.code) so callers
+ * can distinguish INVALID_OTP (2FA required) from INVALID_CREDENTIALS.
+ */
+export class AuthApiError extends Error {
   code?: string;
+  status?: number;
+
+  constructor(message: string, code?: string, status?: number) {
+    super(message);
+    this.name = 'AuthApiError';
+    this.code = code;
+    this.status = status;
+  }
 }
 
 /**
- * Login with email and password
+ * True when a login failure means "TFA is enabled, provide an OTP".
+ * Primary signal is the INVALID_OTP code; a message match is a robust
+ * fallback in case Directus wording/codes change across versions.
  */
-export async function login(email: string, password: string): Promise<{ user: DirectusUser; auth: AuthResponse }> {
+export function isOtpRequiredError(err: unknown): boolean {
+  if (err instanceof AuthApiError && err.code === 'INVALID_OTP') return true;
+  const msg = err instanceof Error ? err.message : '';
+  return /otp|2fa|two-factor|tfa/i.test(msg);
+}
+
+/**
+ * Login with email and password (and OTP if the account has TFA enabled).
+ * On the first attempt omit `otp`; if Directus returns INVALID_OTP, retry
+ * with the 6-digit code.
+ */
+export async function login(
+  email: string,
+  password: string,
+  otp?: string,
+): Promise<{ user: DirectusUser; auth: AuthResponse }> {
+  const body: { email: string; password: string; otp?: string } = { email, password };
+  if (otp) body.otp = otp; // never send otp:"" — Directus may treat it differently
+
   const response = await fetch(`${BACKEND_URL}/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error?.errors?.[0]?.message || 'Login failed. Please check your credentials.');
+    const parsed = await response.json().catch(() => ({}));
+    const first = parsed?.errors?.[0];
+    throw new AuthApiError(
+      first?.message || 'Login failed. Please check your credentials.',
+      first?.extensions?.code,
+      response.status,
+    );
   }
 
   const data = await response.json();

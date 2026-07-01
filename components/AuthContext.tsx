@@ -15,7 +15,7 @@ interface AuthContextType {
     user: DirectusUser | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string, otp?: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
 }
@@ -51,8 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         initAuth();
     }, []);
 
-    const login = useCallback(async (email: string, password: string) => {
-        const result = await authLogin(email, password);
+    const login = useCallback(async (email: string, password: string, otp?: string) => {
+        const result = await authLogin(email, password, otp);
         setUser(result.user);
     }, []);
 

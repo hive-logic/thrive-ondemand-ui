@@ -31,11 +31,6 @@ export interface AuthResponse {
   expires: number; // milliseconds until expiry
 }
 
-export interface AuthError {
-  message: string;
-  code?: string;
-}
-
 /**
  * Typed error for Directus auth API failures.
  * Carries the Directus error code (errors[0].extensions.code) so callers

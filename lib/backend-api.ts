@@ -176,39 +176,10 @@ export type LiveAlert = {
   date_created?: string;
   user_gps_coordinates?: string;
   seen_by?: string[];
-  notification_id?: string;
   source?: string;
   triggers?: string[];
   actions?: string[];
 };
-
-export async function fetchLiveAlerts(customerId: string, accessToken: string): Promise<LiveAlert | null> {
-  try {
-    const url = `${API_BASE_URL}/v1/last_event_alert`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ customer_id: customerId }),
-    });
-
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (data && data.id && !data.error) {
-      return {
-        ...data,
-        title: data.title || 'Event Alert',
-        date_created: data.date_created || new Date().toISOString(),
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 export async function fetchLastNotification(customerId: string, accessToken: string): Promise<LiveAlert | null> {
   try {
@@ -279,7 +250,6 @@ export async function fetchLastNotification(customerId: string, accessToken: str
         date_created: data.date_created || new Date().toISOString(),
         seen_by: data.seen_by || [],
         source: 'notification',
-        notification_id: data.id,
         triggers,
         actions: actions,
       };
@@ -287,24 +257,5 @@ export async function fetchLastNotification(customerId: string, accessToken: str
     return null;
   } catch {
     return null;
-  }
-}
-
-
-export async function markAlertSeen(notificationId: string, userId: string, customerId: string, accessToken: string): Promise<boolean> {
-  try {
-    const url = `${API_BASE_URL}/v1/mark_event_alert_seen`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ notification_id: notificationId, user_id: userId, customer_id: customerId }),
-    });
-    return response.ok;
-  } catch {
-    return false;
   }
 }

@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { fetchQuickActionsData, fetchAccessZones, fetchLiveAlerts, fetchLastNotification, markAlertSeen, LiveAlert } from "@/lib/backend-api";
+import { fetchQuickActionsData, fetchAccessZones, fetchLastNotification, LiveAlert } from "@/lib/backend-api";
 import { requestUserLocation } from "@/lib/geolocation";
 import {
     getAuthWS,
@@ -281,24 +281,14 @@ export default function AuthenticatedChatWindow() {
             : new Set<string>()
     );
 
-    // Helper: dismiss an alert (localStorage + backend seen_by)
-    const dismissAlertById = useCallback((alertId: string, notificationId?: string) => {
-        // Add to seenAlertIds ref
+    // Dismiss locally so the same last_alert row does not reappear on the next poll.
+    const dismissAlertById = useCallback((alertId: string) => {
         seenAlertIds.current.add(alertId);
-        // Persist to localStorage
         try {
             localStorage.setItem('dismissedAlertIds', JSON.stringify([...seenAlertIds.current]));
         } catch { }
-        // Remove from local list
         setLiveAlerts((prev) => prev.filter((a) => a.id !== alertId));
-        // Mark seen on backend if notification_id is available
-        if (notificationId && user?.id && user?.customer?.id) {
-            const token = getStoredAccessToken();
-            if (token) {
-                markAlertSeen(notificationId, user.id, user.customer.id, token).catch(() => { });
-            }
-        }
-    }, [user]);
+    }, []);
 
     // ── Speech-to-Text state ──
     const [isListening, setIsListening] = useState(false);
@@ -339,7 +329,7 @@ export default function AuthenticatedChatWindow() {
         loadActions();
     }, [user]);
 
-    // Poll for live alerts every 30s
+    // Poll for the latest notification alert
     useEffect(() => {
         if (!user?.customer?.id) return;
         const token = getStoredAccessToken();
@@ -363,11 +353,7 @@ export default function AuthenticatedChatWindow() {
         }
 
         async function pollAlerts() {
-            const [eventAlert, notification] = await Promise.all([
-                fetchLiveAlerts(user!.customer!.id, token!),
-                fetchLastNotification(user!.customer!.id, token!),
-            ]);
-            addAlertIfNew(eventAlert);
+            const notification = await fetchLastNotification(user!.customer!.id, token!);
             addAlertIfNew(notification);
         }
 
@@ -702,7 +688,7 @@ Use the quick buttons below to get started.`;
                                         type="button"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            dismissAlertById(alert.id, alert.notification_id);
+                                            dismissAlertById(alert.id);
                                         }}
                                         className="mt-0.5 w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-all flex-shrink-0"
                                         title="Dismiss alert"
@@ -1289,7 +1275,7 @@ Use the quick buttons below to get started.`;
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => {
-                                        dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
+                                        dismissAlertById(selectedAlert.id);
                                         setSelectedAlert(null);
                                     }}
                                     className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-[0.98]"
@@ -1304,7 +1290,7 @@ Use the quick buttons below to get started.`;
                                         const desc = selectedAlert.description ? ` — ${selectedAlert.description}` : '';
                                         const userMsg = `🔔 Alert: ${title}${loc}${time}.${desc} What should I know about this alert?`;
                                         sendAll(userMsg);
-                                        dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
+                                        dismissAlertById(selectedAlert.id);
                                         setSelectedAlert(null);
                                     }}
                                     className="flex-1 py-3 rounded-xl text-[13px] font-semibold bg-primary/20 border border-primary/30 text-primary hover:bg-primary/30 transition-all active:scale-[0.98]"
@@ -1340,7 +1326,7 @@ Use the quick buttons below to get started.`;
                                         const friendlyLabel = protocolLabels[protocolType] || '⚠️ Alert';
                                         const siteName = selectedAlert.site_name || selectedAlert.activity_name || 'the site';
                                         sendQuickAction(`Activating ${friendlyLabel} protocol at ${siteName}`, payload);
-                                        dismissAlertById(selectedAlert.id, selectedAlert.notification_id);
+                                        dismissAlertById(selectedAlert.id);
                                         setSelectedAlert(null);
                                     }}
                                     className="w-full py-3 rounded-xl text-[13px] font-semibold bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all active:scale-[0.98]"
